@@ -23,20 +23,20 @@ function suite(name) { console.log(`\n${name}`); }
 
 import {
   TILE, MAP_W, MAP_H, HALF_W, HALF_H, T, CONST_SPEED, CAR_HL, CAR_HW
-} from './js/constants.js';
+} from './src/constants.js';
 
 import {
   tileMap, mi, tileAt, tileCenter, tileCenterX, tileCenterZ,
   passable, resetMap, buildRandom, buildParis,
   bldgH, bldgW, bldgD, bldgStyle, parkShade, waterMrk,
-} from './js/map.js';
+} from './src/map.js';
 
 import {
   dirX, dirZ, prevDirX, prevDirZ, turnBias, stuckTimer, ROT_SPEED,
   resetPhysics, setDir,
   cornersForDir, leadingPointsForDir, clearForDir, leadingClearForDir,
   moveWithCollision,
-} from './js/physics.js';
+} from './src/physics.js';
 
 
 // ─── 1. constants ─────────────────────────────────────────────────────────────
