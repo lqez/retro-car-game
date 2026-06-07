@@ -1,0 +1,26 @@
+{
+  "name": "retro-car-game",
+  "version": "1.0.0",
+  "description": "City Car — a top-view retro driving game built with Three.js",
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs",
+    "test": "node test.mjs"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/lqez/retro-car-game"
+  },
+  "keywords": [
+    "three.js",
+    "game",
+    "webgl"
+  ],
+  "license": "ISC",
+  "devDependencies": {
+    "esbuild": "^0.24.0"
+  },
+  "dependencies": {
+    "three": "^0.160.0"
+  }
+}
