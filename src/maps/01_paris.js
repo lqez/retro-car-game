@@ -6,10 +6,38 @@ import { MAP_W, MAP_H, HALF_W, HALF_H,
 export const mapW = 80, mapH = 80;
 export const hasLandmarks = true;
 export const gameplay = Object.freeze({
-  enemyCount: 8,
-  diamondCount: 8,
-  timeLimit: 90,
+  enemyCount: 14,
+  diamondCount: 12,
+  timeLimit: 80,
 });
+
+function freezeFootprints(footprints) {
+  return Object.freeze(footprints.map(fp => Object.freeze(fp)));
+}
+
+export const eiffelLegFootprints = freezeFootprints([
+  {name:'Eiffel Tower NW leg', x0:8,  y0:52, w:2, h:2},
+  {name:'Eiffel Tower NE leg', x0:14, y0:52, w:2, h:2},
+  {name:'Eiffel Tower SW leg', x0:8,  y0:58, w:2, h:2},
+  {name:'Eiffel Tower SE leg', x0:14, y0:58, w:2, h:2},
+]);
+
+export const solidLandmarkFootprints = freezeFootprints([
+  {name:'Arc de Triomphe', x0:37, y0:29, w:4, h:4},
+  {name:'Notre-Dame',     x0:42, y0:43, w:4, h:3},
+  {name:'Sacré-Cœur',     x0:17, y0:2,  w:5, h:4},
+  {name:'Louvre',         x0:42, y0:34, w:4, h:4},
+  {name:'Opéra Garnier',  x0:44, y0:16, w:4, h:4},
+  {name:'Les Invalides',  x0:18, y0:54, w:4, h:4},
+  {name:'Pompidou',       x0:54, y0:34, w:3, h:3},
+  {name:'Panthéon',       x0:44, y0:54, w:3, h:4},
+  {name:'Moulin Rouge',   x0:26, y0:9,  w:3, h:3},
+]);
+
+export const blockedLandmarkFootprints = Object.freeze([
+  ...eiffelLegFootprints,
+  ...solidLandmarkFootprints,
+]);
 
 export function build() {
   initMap(mapW, mapH);
@@ -123,40 +151,20 @@ export function build() {
 
   // ── LANDMARK TILE RESERVATIONS ─────────────────────────────────────────────
   // bldgW=255 blocks the greedy tiler; tiles become fully impassable BUILDING.
-  // ROAD/BRIDGE/WATER tiles inside a zone are skipped (kept as roads).
-  function lmk(x0,y0,w,h){
+  function blockFootprint({x0,y0,w,h}){
     for(let dy=0;dy<h;dy++) for(let dx=0;dx<w;dx++){
       const x=x0+dx, y=y0+dy;
       if(x<0||x>=MAP_W||y<0||y>=MAP_H) continue;
       const id=mi(x,y);
-      if(tileMap[id]===T.ROAD||tileMap[id]===T.BRIDGE||tileMap[id]===T.WATER) continue;
-      tileMap[id]=T.BUILDING; bldgW[id]=255;
+      tileMap[id]=T.BUILDING; waterMrk[id]=0; parkShade[id]=0; bldgW[id]=255;
     }
   }
 
   // Eiffel Tower — four corner legs (2×2 each); interior is the crossroads.
-  // lmk() skips ROAD tiles so the bottom legs (on the y=58-59 boulevard) need
-  // an explicit override after lmk() to become truly impassable.  (cx=-336, cz=192)
-  lmk(8,52,2,2); lmk(14,52,2,2); lmk(8,58,2,2); lmk(14,58,2,2);
-  // Force all four 2×2 leg blocks to BUILDING+255 regardless of road status
-  for (const [x0,y0] of [[8,52],[14,52],[8,58],[14,58]])
-    for (let dy=0;dy<2;dy++) for (let dx=0;dx<2;dx++) {
-      const id=mi(x0+dx,y0+dy); tileMap[id]=T.BUILDING; bldgW[id]=255;
-    }
+  for(const fp of eiffelLegFootprints) blockFootprint(fp);
+  for(const fp of solidLandmarkFootprints) blockFootprint(fp);
 
-  lmk(37,29,4,4);                                        // Arc de Triomphe  (cx=-12,  cz=-108)
-  lmk(42,43,4,3);                                        // Notre-Dame        (cx=48,   cz=54)
-
-  // Sacré-Cœur — moved to x=17-21 to avoid the x=[16,17] avenue cutting through
-  // (cx=-246, cz=-432 — slightly west of old position)
-  lmk(17,2,5,4);
-
-  lmk(42,34,4,4);                                        // Louvre            (cx=48,   cz=-48)
-  lmk(44,16,4,4);                                        // Opéra Garnier     (cx=72,   cz=-264)
-  lmk(18,54,4,4);                                        // Les Invalides     (cx=-240, cz=192)
-  lmk(54,34,3,3);                                        // Pompidou          (cx=186,  cz=-54)
-  lmk(44,54,3,4);                                        // Panthéon          (cx=66,   cz=192)
-  lmk(26,9,3,3);                                         // Moulin Rouge      (cx=-162, cz=-354)
+  pruneOrphanRoads();
 
   // ── GREEDY RECTANGLE TILING for regular buildings ─────────────────────────
   const free=(x,y)=> x>=0&&y>=0&&x<MAP_W&&y<MAP_H&&

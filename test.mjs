@@ -70,21 +70,21 @@ suite('map module metadata');
 test('randomMap has runtime-randomized metadata', () => {
   randomMap.build();
   const gameplay = gameplayFor(randomMap);
-  assert.ok(randomMap.mapW >= 40 && randomMap.mapW <= 96, `mapW=${randomMap.mapW}`);
-  assert.equal(randomMap.mapW % 2, 0, 'mapW should stay even');
+  assert.ok(randomMap.mapW >= 32 && randomMap.mapW <= 72, `mapW=${randomMap.mapW}`);
+  assert.equal(randomMap.mapW % 4, 0, 'mapW should stay on the configured step');
   assert.equal(randomMap.mapH, randomMap.mapW);
   assert.equal(randomMap.hasLandmarks, false);
   assert.ok(['day', 'night'].includes(randomMap.theme), `theme=${randomMap.theme}`);
-  assert.ok(gameplay.enemyCount >= 4 && gameplay.enemyCount <= 12, `enemyCount=${gameplay.enemyCount}`);
-  assert.ok(gameplay.diamondCount >= 5 && gameplay.diamondCount <= 14, `diamondCount=${gameplay.diamondCount}`);
-  assert.ok(gameplay.timeLimit >= 60 && gameplay.timeLimit <= 130, `timeLimit=${gameplay.timeLimit}`);
+  assert.ok(gameplay.enemyCount >= 6 && gameplay.enemyCount <= 14, `enemyCount=${gameplay.enemyCount}`);
+  assert.ok(gameplay.diamondCount >= 6 && gameplay.diamondCount <= 15, `diamondCount=${gameplay.diamondCount}`);
+  assert.ok(gameplay.timeLimit >= 40 && gameplay.timeLimit <= 110, `timeLimit=${gameplay.timeLimit}`);
 });
 
 test('parisMap is 80×80 with landmarks', () => {
   assert.equal(parisMap.mapW, 80);
   assert.equal(parisMap.mapH, 80);
   assert.equal(parisMap.hasLandmarks, true);
-  assert.deepEqual(gameplayFor(parisMap), { enemyCount: 8, diamondCount: 8, timeLimit: 90 });
+  assert.deepEqual(gameplayFor(parisMap), { enemyCount: 14, diamondCount: 12, timeLimit: 80 });
 });
 
 test('parisNightMap is 80×80 with landmarks and night theme', () => {
@@ -92,7 +92,7 @@ test('parisNightMap is 80×80 with landmarks and night theme', () => {
   assert.equal(parisNightMap.mapH, 80);
   assert.equal(parisNightMap.hasLandmarks, true);
   assert.equal(parisNightMap.theme, 'night');
-  assert.deepEqual(gameplayFor(parisNightMap), { enemyCount: 10, diamondCount: 10, timeLimit: 105 });
+  assert.deepEqual(gameplayFor(parisNightMap), { enemyCount: 20, diamondCount: 10, timeLimit: 100 });
 });
 
 test('map gameplay falls back to default values', () => {
@@ -111,8 +111,8 @@ suite('map helpers');
 randomMap.build();
 
 test('MAP_W/H updated by build()', () => {
-  assert.ok(MAP_W >= 40 && MAP_W <= 96, `MAP_W=${MAP_W}`);
-  assert.equal(MAP_W % 2, 0, 'MAP_W should stay even');
+  assert.ok(MAP_W >= 32 && MAP_W <= 72, `MAP_W=${MAP_W}`);
+  assert.equal(MAP_W % 4, 0, 'MAP_W should stay on the configured step');
   assert.equal(MAP_H, MAP_W);
   assert.equal(MAP_W, randomMap.mapW);
   assert.equal(MAP_H, randomMap.mapH);
@@ -157,8 +157,8 @@ test('tileCenterZ round-trips for any road tile', () => {
 });
 
 test('tileAt(world) matches tileCenter for known tile', () => {
-  for (let ty = 28; ty <= 36; ty++) {
-    for (let tx = 28; tx <= 36; tx++) {
+  for (let ty = HALF_H - 4; ty <= HALF_H + 4; ty++) {
+    for (let tx = HALF_W - 4; tx <= HALF_W + 4; tx++) {
       const expected = tileMap[mi(tx, ty)];
       const {x, z} = tileCenter(tx, ty);
       assert.equal(tileAt(x, z), expected, `tile(${tx},${ty}) mismatch`);
@@ -307,12 +307,31 @@ test('bldgH 2-14 for paris buildings', () => {
   }
 });
 
-test('Seine rows 44-46 are water or bridge only', () => {
+test('Seine rows 44-46 are water/bridge except the Notre-Dame island', () => {
   for (let ty = 44; ty <= 46; ty++) {
     for (let tx = 0; tx < MAP_W; tx++) {
       const t = tileMap[mi(tx, ty)];
+      const inNotreDame = tx >= 42 && tx < 46 && ty >= 43 && ty < 46;
+      if (inNotreDame) {
+        assert.equal(t, T.BUILDING, `tile(${tx},${ty}) should be Notre-Dame island/building`);
+        continue;
+      }
       assert.ok(t === T.WATER || t === T.BRIDGE,
         `tile(${tx},${ty})=${t} in Seine should be water/bridge`);
+    }
+  }
+});
+
+test('paris landmark footprints do not leave road or bridge tiles underneath', () => {
+  for (const fp of parisMap.blockedLandmarkFootprints) {
+    for (let ty = fp.y0; ty < fp.y0 + fp.h; ty++) {
+      for (let tx = fp.x0; tx < fp.x0 + fp.w; tx++) {
+        const id = mi(tx, ty);
+        assert.equal(tileMap[id], T.BUILDING,
+          `${fp.name} tile(${tx},${ty}) should be reserved as BUILDING`);
+        assert.equal(bldgW[id], 255,
+          `${fp.name} tile(${tx},${ty}) should block regular building tiling`);
+      }
     }
   }
 });
@@ -332,6 +351,18 @@ test('no orphan roads in paris map', () => {
   for (let i=0;i<MAP_W*MAP_H;i++)
     if ((tileMap[i]===T.ROAD||tileMap[i]===T.BRIDGE) && !seen[i]) orphans++;
   assert.equal(orphans, 0, `${orphans} unreachable road tiles remain`);
+});
+
+test('paris roadTiles lists exactly the reachable road/bridge tiles', () => {
+  let roadCount = 0;
+  for (let i=0;i<MAP_W*MAP_H;i++)
+    if (tileMap[i]===T.ROAD||tileMap[i]===T.BRIDGE) roadCount++;
+  assert.ok(roadTiles.length > 0, 'roadTiles is empty');
+  assert.equal(roadTiles.length, roadCount, `roadTiles=${roadTiles.length} road tiles=${roadCount}`);
+  for (const {tx,ty} of roadTiles) {
+    const t = tileMap[mi(tx,ty)];
+    assert.ok(t===T.ROAD||t===T.BRIDGE, `roadTiles entry (${tx},${ty}) is type ${t}`);
+  }
 });
 
 test('paris night duplicates paris tile layout', () => {

@@ -19,6 +19,10 @@ scene.add(carGroup);
 export const wheelMeshes = [];
 export const wR_ = TILE * 0.24 * 0.70;
 
+export function setCarVisible(visible) {
+  carGroup.visible = visible;
+}
+
 // ─── character model loader ──────────────────────────────────────────────────
 const _loader = new GLTFLoader();
 let _loadId = 0; // incremented each load; stale callbacks are ignored

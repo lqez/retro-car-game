@@ -9,7 +9,7 @@ import * as parisNightMap from './maps/02_paris_night.js';
 import { getDiamonds, collectedCount, totalCount, clearDiamonds } from './diamonds.js';
 import { getEnemies, clearEnemies } from './enemies.js';
 import { CHARACTERS, setActiveCharacter } from './characters.js';
-import { loadCharacterModel, resetCrash } from './car.js';
+import { loadCharacterModel, resetCrash, setCarVisible } from './car.js';
 
 const DIAMOND_BLUE = '#2ad4ff';
 const ENEMY_RED    = '#ff4444';
@@ -17,9 +17,12 @@ const ENEMY_RED    = '#ff4444';
 export let gameOn = false;
 
 let overlay, hud, recalBtn, returnBtn, gameOverMsg, btnStart, gasBtn;
-let mapSelectEl, charSelectEl;
+let mapSelectEl, charSelectEl, mapLabelEl, mapCardSelectEl;
 let selectedMap = null;
 let starting = false;
+let menuStep = 'character';
+let charBtns = [];
+let mapCards = [];
 
 const START_BACKDROP_MS = 720;
 const MMAP_VIEW = 32; // tiles visible in the viewport
@@ -29,27 +32,91 @@ let minimapEl, minimapCtx, minimapBg;
 let _ver = 'dev';
 try { _ver = __APP_VERSION__; } catch (_) {}
 
+function focusSoon(el){
+  requestAnimationFrame(() => el?.focus?.());
+}
+
+function activeButtonIndex(buttons){
+  return Math.max(0, buttons.findIndex(b => b.classList.contains('active')));
+}
+
+function selectCharacter(index){
+  if(!charBtns.length) return;
+  const nextIndex = Math.max(0, Math.min(index, charBtns.length - 1));
+  charBtns.forEach(b => b.classList.remove('active'));
+  charBtns[nextIndex].classList.add('active');
+  setActiveCharacter(CHARACTERS[nextIndex]);
+  loadCharacterModel(CHARACTERS[nextIndex]);
+}
+
+function showMapSelection(){
+  menuStep = 'map';
+  mapLabelEl.hidden = false;
+  mapCardSelectEl.hidden = false;
+  focusSoon(mapCards[activeButtonIndex(mapCards)]);
+}
+
+function resetMenuFlow(){
+  menuStep = 'character';
+  selectedMap = null;
+  if(mapLabelEl) mapLabelEl.hidden = true;
+  if(mapCardSelectEl) mapCardSelectEl.hidden = true;
+  if(btnStart){
+    btnStart.disabled = true;
+    btnStart.hidden = true;
+  }
+  mapCards.forEach(b => b.classList.remove('active'));
+  focusSoon(charBtns[activeButtonIndex(charBtns)]);
+}
+
+function moveMenuFocus(buttons, delta){
+  if(!buttons.length) return;
+  const current = buttons.indexOf(document.activeElement);
+  const fallback = activeButtonIndex(buttons);
+  const from = current >= 0 ? current : fallback;
+  const next = (from + delta + buttons.length) % buttons.length;
+  buttons[next].focus();
+  if(buttons === charBtns) selectCharacter(next);
+}
+
+function handleMenuKeydown(e){
+  if(overlay?.style.display === 'none' || starting) return;
+  const isArrow = ['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.code);
+  if(!isArrow) return;
+
+  if(menuStep === 'character'){
+    e.preventDefault();
+    moveMenuFocus(charBtns, e.code === 'ArrowLeft' || e.code === 'ArrowUp' ? -1 : 1);
+    return;
+  }
+
+  if(menuStep === 'map'){
+    e.preventDefault();
+    moveMenuFocus(mapCards, e.code === 'ArrowLeft' || e.code === 'ArrowUp' ? -1 : 1);
+  }
+}
+
 export function initUI(){
   overlay    = document.getElementById('overlay');
   hud        = document.getElementById('hud');
   recalBtn   = document.getElementById('recalBtn');
   mapSelectEl   = document.getElementById('mapSelect');
   charSelectEl  = document.getElementById('charSelect');
+  mapLabelEl = document.getElementById('mapLabel');
+  mapCardSelectEl = document.getElementById('mapCardSelect');
   const verEl = document.getElementById('version');
   if (verEl) verEl.textContent = _ver;
 
   // ── character selection ───────────────────────────────────────────────────
-  const charBtns = charSelectEl ? charSelectEl.querySelectorAll('.charBtn') : [];
+  charBtns = charSelectEl ? [...charSelectEl.querySelectorAll('.charBtn')] : [];
+  setCarVisible(false);
   // Load the default character model immediately
-  loadCharacterModel(CHARACTERS[0]);
+  selectCharacter(0);
 
   charBtns.forEach((btn, i) => {
-    if (i === 0) btn.classList.add('active');
     btn.addEventListener('click', () => {
-      charBtns.forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      setActiveCharacter(CHARACTERS[i]);
-      loadCharacterModel(CHARACTERS[i]);
+      selectCharacter(i);
+      showMapSelection();
     });
   });
 
@@ -57,7 +124,7 @@ export function initUI(){
   btnStart = document.getElementById('btnStart');
   btnStart.addEventListener('click', startGame);
 
-  const mapCards = document.querySelectorAll('.mapCard');
+  mapCards = [...document.querySelectorAll('.mapCard')];
   function selectMap(id, map) {
     mapCards.forEach(b => b.classList.remove('active'));
     const selectedCard = document.getElementById(id);
@@ -70,10 +137,14 @@ export function initUI(){
       overlay.classList.remove('launching');
     }
     btnStart.disabled = false;
+    btnStart.hidden = false;
+    focusSoon(btnStart);
   }
   document.getElementById('btnParis').addEventListener('click',      () => selectMap('btnParis',      parisMap));
   document.getElementById('btnParisNight').addEventListener('click', () => selectMap('btnParisNight', parisNightMap));
   document.getElementById('btnRandom').addEventListener('click',     () => selectMap('btnRandom',     randomMap));
+  document.addEventListener('keydown', handleMenuKeydown);
+  resetMenuFlow();
 
   recalBtn.addEventListener('click', calibrate);
 
@@ -108,6 +179,7 @@ export async function startGame(){
   await new Promise(resolve => setTimeout(resolve, START_BACKDROP_MS));
   overlay.style.display='none';
   overlay.classList.remove('launching');
+  document.activeElement?.blur?.();
   starting=false;
 }
 
@@ -252,6 +324,7 @@ export function showGameOver(won, collected, total){
     gameOverMsg.style.display='block';
   }
   returnBtn.style.display='block';
+  focusSoon(returnBtn);
 }
 
 function returnToMenu(){
@@ -264,11 +337,11 @@ function returnToMenu(){
   clearEnemies();
   clearGas();
   resetCrash();
+  setCarVisible(false);
   minimapBg=null; minimapCtx=null; minimapEl=null;
-  document.querySelectorAll('.mapCard').forEach(b => b.classList.remove('active'));
-  if(btnStart) btnStart.disabled = true;
   mapSelectEl.style.display='flex';
   overlay.classList.remove('launching', 'hasCityBackdrop');
   overlay.style.removeProperty('--city-bg');
   overlay.style.display='flex';
+  resetMenuFlow();
 }

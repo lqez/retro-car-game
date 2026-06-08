@@ -18,6 +18,7 @@
   #overlay.launching::before{opacity:0;transform:scale(1.18);}
   #overlay>*{position:relative;z-index:1;transition:opacity .28s ease;}
   #overlay.launching>*{opacity:0;}
+  [hidden]{display:none!important;}
   #mapSelect{display:flex;flex-direction:column;align-items:center;width:100%;}
   #overlay h1{color:#ffd400;font-size:clamp(2rem,7vw,4rem);font-weight:900;letter-spacing:4px;margin-bottom:10px;text-shadow:0 2px 20px rgba(255,212,0,.5);}
   #hud{position:fixed;top:12px;right:12px;color:#fff;background:rgba(0,0,0,.55);padding:8px 14px;border-radius:10px;font-size:14px;line-height:1.8;white-space:pre;z-index:10;display:none;font-variant-numeric:tabular-nums;}
@@ -39,6 +40,7 @@
   .charBtn img{width:80px;height:80px;object-fit:contain;display:block;pointer-events:none;}
   .charBtn span{font-size:clamp(.82rem,2.2vw,.95rem);font-weight:800;line-height:1;}
   .charBtn:hover,.charBtn:active{background:#fff;transform:scale(.96);}
+  .charBtn:focus-visible{outline:3px solid #fff;outline-offset:4px;}
   .charBtn.active{background:#fff;border-color:#64dcff;box-shadow:0 0 16px rgba(100,220,255,.5);transform:scale(1.1);z-index:1;}
 
   /* ── map cards ───────────────────────────────────────────────── */
@@ -46,6 +48,7 @@
   .mapCard img{width:80px;height:80px;object-fit:contain;display:block;pointer-events:none;}
   .mapCard .mapName{font-size:clamp(.82rem,2.2vw,.95rem);font-weight:800;line-height:1;}
   .mapCard:hover,.mapCard:active{background:rgba(255,212,0,.18);transform:scale(.96);}
+  .mapCard:focus-visible{outline:3px solid #fff;outline-offset:4px;}
   .mapCard.active{background:rgba(255,212,0,.22);border-color:#ffd400;box-shadow:0 0 16px rgba(255,212,0,.5);transform:scale(1.1);z-index:1;}
 
   /* ── section label ───────────────────────────────────────────── */
@@ -54,6 +57,7 @@
   /* ── start button ────────────────────────────────────────────── */
   #btnStart{margin-top:26px;padding:15px 64px;border:none;border-radius:999px;font-size:clamp(1rem,3vw,1.2rem);font-weight:900;background:#ffd400;color:#111;cursor:pointer;box-shadow:0 4px 24px rgba(255,212,0,.45);transition:background .15s,transform .12s,opacity .2s;}
   #btnStart:hover,#btnStart:active{background:#ffe033;transform:scale(.97);}
+  #btnStart:focus-visible,#returnBtn:focus-visible{outline:3px solid #fff;outline-offset:5px;}
   #btnStart:disabled{opacity:.3;cursor:default;transform:none !important;box-shadow:none;}
 </style>
 </head>
@@ -73,15 +77,15 @@
     </div>
 
     <!-- Map selection -->
-    <p class="sectionLabel">도시 선택</p>
-    <div id="mapCardSelect" style="display:flex;flex-wrap:wrap;justify-content:center;gap:14px;margin-bottom:4px;">
+    <p id="mapLabel" class="sectionLabel" hidden>도시 선택</p>
+    <div id="mapCardSelect" style="display:flex;flex-wrap:wrap;justify-content:center;gap:14px;margin-bottom:4px;" hidden>
       <button class="mapCard" id="btnParis"><img src="./assets/maps/image/paris.png" alt="Paris"><span class="mapName">Paris</span></button>
       <button class="mapCard" id="btnParisNight"><img src="./assets/maps/image/paris_night.png" alt="Paris Night"><span class="mapName">Paris Night</span></button>
       <button class="mapCard" id="btnRandom"><img src="./assets/maps/image/random.png" alt="Random"><span class="mapName">Random</span></button>
     </div>
 
     <!-- Start button -->
-    <button id="btnStart" disabled>게임 시작</button>
+    <button id="btnStart" disabled hidden>게임 시작</button>
 
   </div>
   <div id="version" style="margin-top:18px;color:#444;font-size:0.68rem;font-family:monospace;letter-spacing:1px;"></div>

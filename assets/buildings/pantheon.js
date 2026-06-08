@@ -1,42 +1,65 @@
 import * as THREE from 'three';
+import { PARIS_LANDMARK_COLORS as C } from '../../src/constants.js';
 
 export function buildPantheon(add) {
   const cx = 66, cz = 192;
   const PI = Math.PI;
-  const bodyMat = new THREE.MeshToonMaterial({ color: 0xe0d8cc });
-  const colMat  = new THREE.MeshToonMaterial({ color: 0xf0ece4 });
-  const domeMat = new THREE.MeshToonMaterial({ color: 0xc8c0b4 });
-  const pedMat  = new THREE.MeshToonMaterial({ color: 0xd4ccc0 });
+  const bodyMat = new THREE.MeshToonMaterial({ color: C.limestone });
+  const lightMat = new THREE.MeshToonMaterial({ color: C.limestoneLight });
+  const shadeMat = new THREE.MeshToonMaterial({ color: C.limestoneDark });
+  const domeMat = new THREE.MeshToonMaterial({ color: C.slate });
+  const shadowMat = new THREE.MeshToonMaterial({ color: C.shadow });
 
-  const mainBody = new THREE.Mesh(new THREE.BoxGeometry(32, 14, 42), bodyMat);
-  mainBody.position.set(cx, 7, cz); mainBody.castShadow = mainBody.receiveShadow = true; add(mainBody);
-
-  const pedLower = new THREE.Mesh(new THREE.BoxGeometry(26, 4, 2), bodyMat);
-  pedLower.position.set(cx, 15, cz - 22); pedLower.castShadow = true; add(pedLower);
-
-  const pedGable = new THREE.Mesh(new THREE.BoxGeometry(26, 6, 2), pedMat);
-  pedGable.position.set(cx, 18, cz - 22); pedGable.castShadow = true; add(pedGable);
-
-  // Six front columns
-  for (const colX of [cx-12, cx-7, cx-2, cx+2, cx+7, cx+12]) {
-    const col = new THREE.Mesh(new THREE.CylinderGeometry(1.4, 1.6, 14, 10), colMat);
-    col.position.set(colX, 7, cz - 22); col.castShadow = true; add(col);
+  function mesh(geometry, material, x, y, z) {
+    const m = new THREE.Mesh(geometry, material);
+    m.position.set(x, y, z);
+    m.castShadow = m.receiveShadow = true;
+    add(m);
+    return m;
   }
 
-  const drum = new THREE.Mesh(new THREE.CylinderGeometry(8, 9, 8, 20), bodyMat);
-  drum.position.set(cx, 19, cz); drum.castShadow = true; add(drum);
+  function box(x, y, z, w, h, d, mat = bodyMat) {
+    return mesh(new THREE.BoxGeometry(w, h, d), mat, x, y, z);
+  }
 
-  const colonnade = new THREE.Mesh(new THREE.CylinderGeometry(10, 10, 3, 20, 1, true),
-    new THREE.MeshToonMaterial({ color: 0xd8d0c4 }));
-  colonnade.position.set(cx, 20, cz); add(colonnade);
+  function cyl(x, y, z, rt, rb, h, mat = bodyMat, seg = 18) {
+    return mesh(new THREE.CylinderGeometry(rt, rb, h, seg), mat, x, y, z);
+  }
 
-  const dome = new THREE.Mesh(new THREE.SphereGeometry(8.5, 16, 12, 0, PI*2, 0, PI*0.62), domeMat);
-  dome.position.set(cx, 27, cz); dome.castShadow = true; add(dome);
+  function pediment(width, height, depth) {
+    const shape = new THREE.Shape();
+    shape.moveTo(-width / 2, 0);
+    shape.lineTo(width / 2, 0);
+    shape.lineTo(0, height);
+    shape.lineTo(-width / 2, 0);
+    return new THREE.ExtrudeGeometry(shape, { depth, bevelEnabled: false });
+  }
 
-  const lantern = new THREE.Mesh(new THREE.CylinderGeometry(2, 2.5, 5, 12), domeMat);
-  lantern.position.set(cx, 37, cz); add(lantern);
+  box(cx, 7, cz, 34, 14, 42);
+  box(cx, 14.5, cz, 36, 2, 44, shadeMat);
+  box(cx, 9, cz - 25, 32, 12, 7, lightMat);
 
-  const finial = new THREE.Mesh(new THREE.CylinderGeometry(0, 1, 6, 6),
-    new THREE.MeshToonMaterial({ color: 0xd0c8bc }));
-  finial.position.set(cx, 43, cz); add(finial);
+  const frontZ = cz - 29;
+  for (const x of [cx - 13, cx - 8, cx - 3, cx + 3, cx + 8, cx + 13]) {
+    cyl(x, 8, frontZ, 1.2, 1.4, 15, lightMat, 12);
+  }
+  box(cx, 16, frontZ, 31, 2.4, 2.2, lightMat);
+  const ped = mesh(pediment(32, 8, 2.2), lightMat, cx, 17, frontZ - 1.1);
+  box(cx, 18.8, frontZ - 1.35, 20, 1.2, 0.7, shadeMat);
+
+  for (const x of [cx - 11, cx, cx + 11]) {
+    box(x, 7, cz - 21.2, 5.5, 7, 0.8, shadowMat);
+  }
+
+  cyl(cx, 19, cz, 9, 10, 7, bodyMat, 22);
+  cyl(cx, 23, cz, 11, 11, 3, lightMat, 22);
+  const dome = mesh(new THREE.SphereGeometry(9.5, 20, 12, 0, PI * 2, 0, PI * 0.62), domeMat, cx, 31, cz);
+  dome.castShadow = true;
+  cyl(cx, 40, cz, 2.2, 2.8, 5, domeMat, 12);
+  mesh(new THREE.ConeGeometry(1.1, 6, 8), shadeMat, cx, 46, cz);
+
+  for (const [x, z] of [[cx - 18, cz], [cx + 18, cz], [cx, cz - 18], [cx, cz + 18]]) {
+    const saucer = mesh(new THREE.SphereGeometry(5.5, 14, 8, 0, PI * 2, 0, PI * 0.45), domeMat, x, 18, z);
+    saucer.scale.y = 0.55;
+  }
 }

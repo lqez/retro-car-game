@@ -1,5 +1,5 @@
 import { buildScene, sx, sz } from './scene.js';
-import { carGroup, resetCrash } from './car.js';
+import { carGroup, resetCrash, setCarVisible } from './car.js';
 import { resetPhysics } from './physics.js';
 import { placeDiamonds } from './diamonds.js';
 import { placeEnemies } from './enemies.js';
@@ -22,6 +22,7 @@ export function startRound(mapModule){
   const gameplay = gameplayFor(mapModule);
   resetPhysics();
   resetCrash();
+  setCarVisible(true);
   carGroup.position.set(sx, 0, sz);
   placeDiamonds(gameplay.diamondCount);
   placeEnemies(gameplay.enemyCount);

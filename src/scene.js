@@ -2,18 +2,27 @@ import * as THREE from 'three';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass }     from 'three/addons/postprocessing/RenderPass.js';
 import { ShaderPass }     from 'three/addons/postprocessing/ShaderPass.js';
-import { TILE, T, CAM_FOV, CAM_HEIGHT, BARREL_K, FOG_NEAR, FOG_FAR } from './constants.js';
+import {
+  TILE, T, CAM_FOV, CAM_HEIGHT, BARREL_K, FOG_NEAR, FOG_FAR,
+  BUILDING_WINDOW_LIT_CHANCE, BUILDING_WINDOW_LIT_TEMPERATURES, BUILDING_DAY_WINDOW_COLORS,
+  BUILDING_WINDOW_WIDTH_MIN, BUILDING_WINDOW_WIDTH_BIG_BONUS, BUILDING_WINDOW_WIDTH_RANDOM,
+  BUILDING_WINDOW_HEIGHT_MIN, BUILDING_WINDOW_HEIGHT_TALL_BONUS, BUILDING_WINDOW_HEIGHT_RANDOM,
+  BUILDING_WINDOW_CELL_FILL,
+  BUILDING_WINDOW_SPAN_MIN, BUILDING_WINDOW_SPAN_RANDOM, BUILDING_WINDOW_SPAN_BIG_BONUS,
+  SAFE_ZONE_OPACITY, STREET_LIGHT_GLOW_SCALE, STREET_LIGHT_GLOW_SCALE_RANDOM,
+} from './constants.js';
 import { MAP_W, MAP_H, HALF_W, HALF_H,
          tileMap, bldgW, bldgD, bldgH, bldgStyle, parkShade,
          mi, hash2, tileCenter, tileCenterX, tileCenterZ } from './map.js';
 import { initLandmarks, clearLandmarks, buildLandmarks } from './landmarks.js';
+import { PROP_MATERIALS, ROCK_PROPS, TREE_PROPS } from '../assets/props/nature.js';
 
 // ─── renderer ────────────────────────────────────────────────────────────────────────────
 const canvas   = document.getElementById('c');
 export const renderer = new THREE.WebGLRenderer({canvas,antialias:true});
 renderer.setPixelRatio(Math.min(devicePixelRatio,2));
 renderer.shadowMap.enabled = true;
-renderer.shadowMap.type    = THREE.PCFSoftShadowMap;
+renderer.shadowMap.type    = THREE.PCFShadowMap;
 
 export const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x87ceeb);
@@ -31,7 +40,10 @@ scene.add(hemiLight);
 const sun = new THREE.DirectionalLight(0xfff0cc, 2.0);
 sun.position.set(60,90,50);
 sun.castShadow = true;
-sun.shadow.mapSize.set(2048,2048);
+sun.shadow.mapSize.set(4096,4096);
+sun.shadow.bias = -0.00008;
+sun.shadow.normalBias = 0.015;
+sun.shadow.radius = 1;
 Object.assign(sun.shadow.camera,{left:-200,right:200,top:200,bottom:-200,near:1,far:500});
 scene.add(sun);
 
@@ -44,13 +56,9 @@ export const D = new THREE.Object3D();
 let mRoad, mBridge, mPark, mWater, mBldgs=[];
 let markMeshes=[];
 let buildingDetailMeshes=[];
+let natureMeshes=[];
 let streetLightMeshes=[];
-let streetLightPositions=[];
-let streetPointLights=[];
 let glowTexture=null;
-
-const STREET_LIGHT_POOL_SIZE = 12;
-const STREET_LIGHT_FOCUS_R = TILE*5.2;
 
 const MAP_THEMES = {
   day: {
@@ -79,8 +87,8 @@ const MAP_THEMES = {
     hemi: { sky: 0x526bb4, ground: 0x263727, intensity: 1.25 },
     sun: { color: 0xe6eeff, intensity: 1.2, position: [-70, 85, -35] },
     ground: 0x332f42,
-    road: 0x42495f,
-    bridge: 0x7b6392,
+    road: 0x586175,
+    bridge: 0x947aae,
     water: 0x243d7c,
     parks: [0x28623f,0x23553a,0x376232,0x2d5738,0x2a5a4c,0x455f38],
     buildings: [0x626277,0x58667e,0x6b6277,0x5a756f,0x6f5d7e,0x6d6665],
@@ -110,6 +118,24 @@ function applyMapTheme(theme){
   sun.position.set(...theme.sun.position);
 }
 
+function colorFromKelvin(kelvin){
+  const temp = kelvin / 100;
+  let r, g, b;
+  if(temp <= 66){
+    r = 255;
+    g = 99.4708025861 * Math.log(temp) - 161.1195681661;
+    b = temp <= 19 ? 0 : 138.5177312231 * Math.log(temp - 10) - 305.0447927307;
+  }else{
+    r = 329.698727446 * Math.pow(temp - 60, -0.1332047592);
+    g = 288.1221695283 * Math.pow(temp - 60, -0.0755148492);
+    b = 255;
+  }
+  r = Math.max(0,Math.min(255,Math.round(r)));
+  g = Math.max(0,Math.min(255,Math.round(g)));
+  b = Math.max(0,Math.min(255,Math.round(b)));
+  return (r << 16) | (g << 8) | b;
+}
+
 function streetGlowTexture(){
   if(glowTexture)return glowTexture;
   const c=document.createElement('canvas');
@@ -125,37 +151,6 @@ function streetGlowTexture(){
   glowTexture=new THREE.CanvasTexture(c);
   glowTexture.colorSpace=THREE.SRGBColorSpace;
   return glowTexture;
-}
-
-export function updateStreetLightFocus(targets=[]){
-  if(streetPointLights.length===0)return;
-  if(streetLightPositions.length===0||targets.length===0){
-    streetPointLights.forEach(l=>{l.visible=false;});
-    return;
-  }
-  const maxD2=STREET_LIGHT_FOCUS_R*STREET_LIGHT_FOCUS_R;
-  const cand=[];
-  for(const target of targets){
-    if(!target)continue;
-    for(let i=0;i<streetLightPositions.length;i++){
-      const p=streetLightPositions[i];
-      const dx=p.x-target.x, dz=p.z-target.z;
-      const d2=dx*dx+dz*dz;
-      if(d2<=maxD2)cand.push({i,d2});
-    }
-  }
-  cand.sort((a,b)=>a.d2-b.d2);
-  const used=new Set();
-  let li=0;
-  for(const c of cand){
-    if(li>=streetPointLights.length)break;
-    if(used.has(c.i))continue;
-    used.add(c.i);
-    const p=streetLightPositions[c.i], l=streetPointLights[li++];
-    l.position.set(p.x,7.2,p.z);
-    l.visible=true;
-  }
-  for(;li<streetPointLights.length;li++)streetPointLights[li].visible=false;
 }
 
 // ─── spawn position (exported, mutated by buildScene) ──────────────────────────────────────
@@ -224,9 +219,8 @@ export function buildScene(mapModule){
   mBldgs=[];
   markMeshes.forEach(m=>scene.remove(m)); markMeshes=[];
   buildingDetailMeshes.forEach(m=>scene.remove(m)); buildingDetailMeshes=[];
+  natureMeshes.forEach(m=>scene.remove(m)); natureMeshes=[];
   streetLightMeshes.forEach(m=>scene.remove(m)); streetLightMeshes=[];
-  streetPointLights.forEach(l=>scene.remove(l)); streetPointLights=[];
-  streetLightPositions=[];
 
   mapModule.build();
   const theme = themeFor(mapModule);
@@ -271,6 +265,7 @@ export function buildScene(mapModule){
   const bi=[0,0,0,0,0,0];
   let ri=0,bri=0,pi=0,wi=0;
   const buildingRoots=[];
+  const parkTiles=[];
 
   for(let ty=0;ty<MAP_H;ty++) for(let tx=0;tx<MAP_W;tx++){
     const id=mi(tx,ty), tp=tileMap[id];
@@ -287,6 +282,7 @@ export function buildScene(mapModule){
       mPark.setMatrixAt(pi, D.matrix);
       const shade = parkShade[id] % 6;
       mPark.setColorAt(pi, new THREE.Color(theme.parks[shade]));
+      parkTiles.push({tx,ty,x,z,shade});
       pi++;
     }else if(tp===T.WATER){
       D.position.set(x,-0.15,z);D.scale.set(1,1,1);D.updateMatrix();
@@ -304,17 +300,114 @@ export function buildScene(mapModule){
   [mRoad,mBridge,mPark,mWater,...mBldgs].forEach(m=>m.instanceMatrix.needsUpdate=true);
   if(mPark.instanceColor) mPark.instanceColor.needsUpdate=true;
 
+  // ─── park props: low-poly trees and stones from assets/props ───────────────────────────────
+  {
+    const buckets = new Map();
+    const matCache = new Map();
+    const geoCache = new Map();
+    function matFor(key){
+      if(!matCache.has(key)) matCache.set(key,new THREE.MeshToonMaterial({color:PROP_MATERIALS[key]}));
+      return matCache.get(key);
+    }
+    function geoFor(part){
+      const seg = part.seg || 8;
+      const key = `${part.kind}:${seg}`;
+      if(geoCache.has(key)) return geoCache.get(key);
+      let geo;
+      if(part.kind==='cylinder') geo = new THREE.CylinderGeometry(1,1,1,seg);
+      else if(part.kind==='cone') geo = new THREE.ConeGeometry(1,1,seg);
+      else if(part.kind==='sphere') geo = new THREE.SphereGeometry(1,seg,Math.max(5,Math.floor(seg*0.75)));
+      else if(part.kind==='dodeca') geo = new THREE.DodecahedronGeometry(1,0);
+      else geo = new THREE.BoxGeometry(1,1,1);
+      geoCache.set(key,geo);
+      return geo;
+    }
+    function bucketFor(part){
+      const key = `${part.kind}:${part.seg||8}:${part.mat}`;
+      if(!buckets.has(key)) buckets.set(key,{geo:geoFor(part),mat:matFor(part.mat),items:[]});
+      return buckets.get(key).items;
+    }
+    function addProp(def,x,z,rot,scale){
+      const co=Math.cos(rot), si=Math.sin(rot);
+      for(const part of def.parts){
+        const [px,py,pz]=part.p, [sx,sy,sz]=part.s;
+        const [rx,ry,rz]=part.r || [0,0,0];
+        bucketFor(part).push({
+          x:x+(px*co-pz*si)*scale,
+          y:0.5+py*scale,
+          z:z+(px*si+pz*co)*scale,
+          sx:sx*scale, sy:sy*scale, sz:sz*scale,
+          rx, ry:rot+ry, rz,
+        });
+      }
+    }
+    for(const p of parkTiles){
+      const seed = p.tx*113 + p.ty*197;
+      const hTree = hash2(seed, p.shade+17);
+      const hRock = hash2(seed+41, p.shade+29);
+      if(hTree>0.42){
+        const def = TREE_PROPS[Math.floor(hash2(seed+5,p.shade+7)*TREE_PROPS.length)];
+        const ox=(hash2(seed+11,p.ty)-0.5)*TILE*0.46;
+        const oz=(hash2(seed+13,p.tx)-0.5)*TILE*0.46;
+        const rot=hash2(seed+17,p.tx+p.ty)*Math.PI*2;
+        const scale=2.0+hash2(seed+19,p.shade)*3.0;
+        addProp(def,p.x+ox,p.z+oz,rot,scale);
+      }
+      if(hRock>0.78){
+        const def = ROCK_PROPS[Math.floor(hash2(seed+23,p.shade+31)*ROCK_PROPS.length)];
+        const ox=(hash2(seed+29,p.ty)-0.5)*TILE*0.56;
+        const oz=(hash2(seed+31,p.tx)-0.5)*TILE*0.56;
+        const rot=hash2(seed+37,p.tx-p.ty)*Math.PI*2;
+        const scale=0.75+hash2(seed+43,p.shade)*0.5;
+        addProp(def,p.x+ox,p.z+oz,rot,scale);
+      }
+    }
+    for(const {geo,mat,items} of buckets.values()){
+      if(!items.length) continue;
+      const mesh = new THREE.InstancedMesh(geo,mat,items.length);
+      mesh.castShadow = mesh.receiveShadow = true;
+      items.forEach(({x,y,z,sx,sy,sz,rx,ry,rz},i)=>{
+        D.rotation.set(rx,ry,rz);
+        D.position.set(x,y,z);
+        D.scale.set(sx,sy,sz);
+        D.updateMatrix();
+        mesh.setMatrixAt(i,D.matrix);
+      });
+      mesh.instanceMatrix.needsUpdate=true;
+      scene.add(mesh);
+      natureMeshes.push(mesh);
+    }
+  }
+
   // ─── building details ───────────────────────────────────────────────────────────────────────
   {
     const isNight = mapModule.theme==='night';
-    const darkWindows=[], litWindows=[], roofCaps=[], roofBlocks=[], roofVents=[], roofTanks=[];
+    const darkWindowPalette = isNight
+      ? [0x16233a,0x20345a,0x19314a,0x27305c,0x195568]
+      : BUILDING_DAY_WINDOW_COLORS;
+    const litWindowPalette = isNight
+      ? BUILDING_WINDOW_LIT_TEMPERATURES.map(colorFromKelvin)
+      : [];
+    const windowPalettes = isNight
+      ? [...darkWindowPalette, ...litWindowPalette]
+      : darkWindowPalette;
+    const litBucketStart = darkWindowPalette.length;
+    const windowBuckets = windowPalettes.map(()=>[]);
+    const roofCaps=[], roofCapsGreen=[], roofWalls=[], roofBlocks=[], roofElevators=[], roofVents=[];
+    const roofTanksYellow=[], roofTanksGray=[], roofTanksBlue=[];
     const windowGeo = new THREE.BoxGeometry(1,1,0.08);
     const boxGeo = new THREE.BoxGeometry(1,1,1);
-    const tankGeo = new THREE.CylinderGeometry(1,1,1,10);
-    const winDarkMat = new THREE.MeshToonMaterial({color:theme.windowDark});
-    const winLitMat = new THREE.MeshBasicMaterial({color:theme.windowLit});
+    const tankGeo = new THREE.CylinderGeometry(1,1,1,16);
+    const windowMats = windowPalettes.map((color,i)=>{
+      if(isNight && i>=5) return new THREE.MeshBasicMaterial({color});
+      return new THREE.MeshToonMaterial({color});
+    });
     const roofMat = new THREE.MeshToonMaterial({color:theme.roof});
     const roofAltMat = new THREE.MeshToonMaterial({color:theme.roofAlt});
+    const roofGreenMat = new THREE.MeshToonMaterial({color:mapModule.theme==='night'?0x1f3c33:0x2b4f37});
+    const tankYellowMat = new THREE.MeshToonMaterial({color:0xd9b13c});
+    const tankGrayMat = new THREE.MeshToonMaterial({color:mapModule.theme==='night'?0x485066:0x8b9090});
+    const tankBlueMat = new THREE.MeshToonMaterial({color:0x16284f});
     const wallInset = 0.055;
 
     function isBuildingTile(tx,ty){
@@ -333,31 +426,72 @@ export function buildScene(mapModule){
     function pushWindow(list,x,y,z,w,h,rot=0){
       list.push({x,y,z,w,h,rot});
     }
+    function glassSpecFor(root){
+      if(root.glassSpec)return root.glassSpec;
+      const {tx,ty,fw,fd,bh}=root;
+      const area = fw*fd;
+      const big = Math.min(1,(area-1)/15);
+      const tall = Math.min(1,bh/18);
+      const seed = tx*97 + ty*131;
+      const pattern = Math.floor(hash2(seed+3,ty+5)*5);
+      const colStepMul = Math.max(0.30,[0.35,0.46,0.56,0.74,0.92][pattern] - big*0.10 - tall*0.03);
+      const rowStepBase = [2.55,3.25,4.15,5.25,6.2][Math.floor(hash2(seed+7,tx+13)*5)];
+      const w = BUILDING_WINDOW_WIDTH_MIN
+        + big*BUILDING_WINDOW_WIDTH_BIG_BONUS
+        + hash2(seed+17,ty+19)*BUILDING_WINDOW_WIDTH_RANDOM;
+      const h = BUILDING_WINDOW_HEIGHT_MIN
+        + tall*BUILDING_WINDOW_HEIGHT_TALL_BONUS
+        + hash2(seed+23,tx+29)*BUILDING_WINDOW_HEIGHT_RANDOM;
+      const rowStep = rowStepBase - tall*0.55 - big*0.25;
+      const y0 = 0.4 + Math.max(0.88, bh*(0.09 + hash2(seed+29,tx+31)*0.08));
+      const ySpan = Math.max(0.1, bh - Math.max(1.65, 1.3 + tall*1.1));
+      let rows = Math.max(1,Math.min(10,Math.floor((bh+1.4)/rowStep)));
+      while(rows>1 && (ySpan/rows)*BUILDING_WINDOW_CELL_FILL < h) rows--;
+      const spanMul = BUILDING_WINDOW_SPAN_MIN
+        + hash2(seed+37,ty+39)*BUILDING_WINDOW_SPAN_RANDOM
+        + big*BUILDING_WINDOW_SPAN_BIG_BONUS;
+      const bucket = Math.floor(hash2(seed+31,ty+37)*darkWindowPalette.length);
+      const litBucket = Math.floor(hash2(seed+41,ty+43)*BUILDING_WINDOW_LIT_TEMPERATURES.length);
+      root.glassSpec = {
+        pattern, colStepMul, w, h, rows, y0, ySpan, spanMul, bucket, litBucket,
+      };
+      return root.glassSpec;
+    }
+    function windowBucketFor(glass,baseHash,c,r,tx,ty){
+      if(!isNight)return glass.bucket;
+      const lit = hash2(baseHash+c*67+17,r*71+tx*13) < BUILDING_WINDOW_LIT_CHANCE;
+      if(!lit)return glass.bucket;
+      return litBucketStart + glass.litBucket;
+    }
     function addWindows(root,side){
       const {tx,ty,fw,fd,bx,bz,bh}=root;
       if(!sideVisible(tx,ty,fw,fd,side))return;
+      const glass = glassSpecFor(root);
       const alongX = side==='n'||side==='s';
-      const faceLen = (alongX?fw:fd)*TILE*0.72;
-      const cols = Math.max(1,Math.min(6,Math.floor(faceLen/(TILE*0.48))));
-      const rows = Math.max(1,Math.min(5,Math.floor((bh+0.8)/3.8)));
-      const span = faceLen*0.84;
-      const ww = Math.min(TILE*0.23, span/(cols*2.25));
-      const wh = Math.min(1.55, Math.max(0.82, bh/(rows*3.5)));
-      const y0 = 0.4 + Math.max(0.95, bh*0.13);
-      const ySpan = Math.max(0.1, bh - Math.max(1.8, wh*1.6));
+      const faceTiles = alongX ? fw : fd;
+      const faceLen = faceTiles*TILE*0.72;
+      const baseHash = tx*31 + ty*47 + (side.charCodeAt(0)*11);
+      let cols = Math.max(1,Math.min(14,Math.floor(faceLen/(TILE*glass.colStepMul))));
+      const span = faceLen*glass.spanMul;
+      const rows = glass.rows;
+      const y0 = glass.y0;
+      const ySpan = glass.ySpan;
+      while(cols>1 && (span/cols)*BUILDING_WINDOW_CELL_FILL < glass.w) cols--;
+      const cellW = span/cols;
+      const cellH = rows===1 ? ySpan : ySpan/rows;
+      const ww = Math.min(cellW*BUILDING_WINDOW_CELL_FILL, glass.w);
+      const wh = Math.min(cellH*BUILDING_WINDOW_CELL_FILL, glass.h);
       const sideSign = side==='s'||side==='e' ? 1 : -1;
       const faceX = bx + sideSign*fw*TILE*0.42;
       const faceZ = bz + sideSign*fd*TILE*0.42;
-      const baseHash = tx*31 + ty*47 + (side.charCodeAt(0)*11);
       for(let r=0;r<rows;r++) for(let c=0;c<cols;c++){
-        if(hash2(baseHash+c*3,r+ty*5)<0.12)continue;
-        const along = cols===1 ? 0 : -span*0.5 + (c+0.5)*span/cols;
-        const y = y0 + (rows===1 ? ySpan*0.44 : (r+0.5)*ySpan/rows);
-        const lit = isNight && hash2(baseHash+c*13,r*17+9)>0.68;
+        const along = cols===1 ? 0 : -span*0.5 + (c+0.5)*cellW;
+        const y = y0 + (rows===1 ? ySpan*0.44 : (r+0.5)*cellH);
+        const bucket = windowBuckets[windowBucketFor(glass,baseHash,c,r,tx,ty)];
         if(alongX){
-          pushWindow(lit?litWindows:darkWindows,bx+along,y,faceZ+sideSign*wallInset,ww,wh,0);
+          pushWindow(bucket,bx+along,y,faceZ+sideSign*wallInset,ww,wh,0);
         }else{
-          pushWindow(lit?litWindows:darkWindows,faceX+sideSign*wallInset,y,bz+along,ww,wh,Math.PI/2);
+          pushWindow(bucket,faceX+sideSign*wallInset,y,bz+along,ww,wh,Math.PI/2);
         }
       }
     }
@@ -366,14 +500,35 @@ export function buildScene(mapModule){
       const top = 0.4 + bh;
       const roofW = Math.max(1,TILE*0.86*fw);
       const roofD = Math.max(1,TILE*0.86*fd);
-      roofCaps.push({x:bx,y:top+0.12,z:bz,sx:roofW,sy:0.24,sz:roofD,rot:0});
+      const cap = {x:bx,y:top+0.13,z:bz,sx:roofW,sy:0.26,sz:roofD,rot:0};
+      (hash2(tx+41,ty+59)>0.76 ? roofCapsGreen : roofCaps).push(cap);
+      if(hash2(tx+31,ty+43)>0.34){
+        const wallH = 0.62 + hash2(tx+47,ty+61)*0.56;
+        const wallT = Math.min(0.86,Math.max(0.44,Math.min(roofW,roofD)*0.08));
+        const wallY = top+0.26+wallH*0.5;
+        roofWalls.push(
+          {x:bx,y:wallY,z:bz-roofD*0.5+wallT*0.5,sx:roofW+wallT*0.5,sy:wallH,sz:wallT,rot:0},
+          {x:bx,y:wallY,z:bz+roofD*0.5-wallT*0.5,sx:roofW+wallT*0.5,sy:wallH,sz:wallT,rot:0},
+          {x:bx-roofW*0.5+wallT*0.5,y:wallY,z:bz,sx:wallT,sy:wallH,sz:Math.max(wallT,roofD-wallT*1.2),rot:0},
+          {x:bx+roofW*0.5-wallT*0.5,y:wallY,z:bz,sx:wallT,sy:wallH,sz:Math.max(wallT,roofD-wallT*1.2),rot:0},
+        );
+      }
       if(hash2(tx+19,ty+23)>0.58){
-        const sx=Math.min(TILE*0.34,roofW*0.34), sz=Math.min(TILE*0.30,roofD*0.34);
+        const sx=Math.min(TILE*0.46,roofW*0.40), sz=Math.min(TILE*0.40,roofD*0.40);
         roofBlocks.push({
-          x:bx+roofW*(hash2(tx+4,ty+7)-0.5)*0.42,
-          y:top+0.78,
-          z:bz+roofD*(hash2(tx+8,ty+5)-0.5)*0.42,
-          sx, sy:1.32, sz, rot:0,
+          x:bx+roofW*(hash2(tx+4,ty+7)-0.5)*0.38,
+          y:top+0.9,
+          z:bz+roofD*(hash2(tx+8,ty+5)-0.5)*0.38,
+          sx, sy:1.54, sz, rot:(Math.floor(hash2(tx+10,ty+12)*2))*Math.PI/2,
+        });
+      }
+      if(fw*fd>=4&&hash2(tx+83,ty+11)>0.64){
+        const sx=Math.min(TILE*0.58,roofW*0.42), sz=Math.min(TILE*0.46,roofD*0.38);
+        roofElevators.push({
+          x:bx+roofW*(hash2(tx+13,ty+31)-0.5)*0.36,
+          y:top+1.12,
+          z:bz+roofD*(hash2(tx+17,ty+47)-0.5)*0.36,
+          sx, sy:2.0, sz, rot:(Math.floor(hash2(tx+23,ty+29)*4))*Math.PI/2,
         });
       }
       const vents = Math.min(3,Math.max(1,Math.floor((fw*fd+2)/8)));
@@ -381,20 +536,23 @@ export function buildScene(mapModule){
         if(hash2(tx+i*5,ty+i*7)<0.28)continue;
         roofVents.push({
           x:bx+roofW*(hash2(tx+i*11,ty+3)-0.5)*0.58,
-          y:top+0.46,
+          y:top+0.56,
           z:bz+roofD*(hash2(tx+5,ty+i*13)-0.5)*0.58,
-          sx:Math.min(1.8,roofW*0.18),
-          sy:0.7,
-          sz:Math.min(1.4,roofD*0.18),
+          sx:Math.min(2.3,roofW*0.22),
+          sy:0.9,
+          sz:Math.min(1.9,roofD*0.22),
           rot:(Math.floor(hash2(tx+i,ty+i)*4))*Math.PI/2,
         });
       }
-      if(fw*fd>=6&&hash2(tx+71,ty+37)>0.66){
-        roofTanks.push({
+      if(fw*fd>=5&&hash2(tx+71,ty+37)>0.56){
+        const pick = hash2(tx+101,ty+107);
+        const tankList = pick < 0.42 ? roofTanksYellow : pick < 0.74 ? roofTanksGray : roofTanksBlue;
+        const radius = Math.min(TILE*0.18, Math.min(roofW,roofD)*0.16);
+        tankList.push({
           x:bx+roofW*(hash2(tx+2,ty+17)-0.5)*0.48,
-          y:top+0.8,
+          y:top+1.0,
           z:bz+roofD*(hash2(tx+29,ty+6)-0.5)*0.48,
-          sx:0.78, sy:1.45, sz:0.78, rot:0,
+          sx:radius, sy:1.9, sz:radius, rot:0,
         });
       }
     }
@@ -434,12 +592,16 @@ export function buildScene(mapModule){
     });
 
     [
-      makeWindowMesh(darkWindows,winDarkMat),
-      makeWindowMesh(litWindows,winLitMat),
+      ...windowBuckets.map((bucket,i)=>makeWindowMesh(bucket,windowMats[i])),
       makeBoxMesh(roofCaps,roofMat),
+      makeBoxMesh(roofCapsGreen,roofGreenMat),
+      makeBoxMesh(roofWalls,roofAltMat),
       makeBoxMesh(roofBlocks,roofAltMat),
+      makeBoxMesh(roofElevators,roofAltMat),
       makeBoxMesh(roofVents,roofAltMat),
-      makeBoxMesh(roofTanks,roofAltMat,tankGeo),
+      makeBoxMesh(roofTanksYellow,tankYellowMat,tankGeo),
+      makeBoxMesh(roofTanksGray,tankGrayMat,tankGeo),
+      makeBoxMesh(roofTanksBlue,tankBlueMat,tankGeo),
     ].forEach(m=>{if(m)buildingDetailMeshes.push(m);});
   }
 
@@ -471,8 +633,8 @@ export function buildScene(mapModule){
     Math.max(0.01,MARK_EDGE-WHITE_LINE_W*0.5),
     MARK_EDGE+WHITE_LINE_W*0.5
   );
-  const roadWhiteMat = new THREE.MeshBasicMaterial({color:theme.whiteMark,opacity:0.82,transparent:true,depthWrite:false,side:THREE.DoubleSide});
-  const roadYellowMat = new THREE.MeshBasicMaterial({color:theme.yellowMark,opacity:0.48,transparent:true,depthWrite:false,side:THREE.DoubleSide});
+  const roadWhiteMat = new THREE.MeshBasicMaterial({color:theme.whiteMark,opacity:0.6,transparent:true,depthWrite:false,side:THREE.DoubleSide});
+  const roadYellowMat = new THREE.MeshBasicMaterial({color:theme.yellowMark,opacity:0.6,transparent:true,depthWrite:false,side:THREE.DoubleSide});
   const whiteMarks = [], whiteDots = [], whiteArcs = [], yellowMarks = [];
   const streetLights = [];
   const STREET_LIGHT_STEP = 3;
@@ -664,10 +826,12 @@ export function buildScene(mapModule){
         for(let y=r.ty1;y<=r.ty2;y++) for(let x=r.tx1;x<=r.tx2;x++) szCov[mi(x,y)]=1;
       }
     }
-    const BT=TILE*0.09, CR=TILE*0.4, HL=TILE*0.5, HW=TILE*0.065, HG=TILE*0.58;
+    const BT=WHITE_LINE_W, CR=TILE*0.4, HL=TILE/3, HW=TILE*0.065, HG=TILE*0.58;
+    const HP=(HL+HW)*0.5*Math.SQRT1_2;
+    const HO=BT*0.5+HP+TILE*0.015;
     const szBM=[], szBA=[], szHM=[];
     const szArcGeo=makeQuarterArcGeometry(Math.max(0.01,CR-BT*0.5),CR+BT*0.5);
-    const szMat=new THREE.MeshBasicMaterial({color:theme.whiteMark,opacity:0.85,transparent:true,depthWrite:false,side:THREE.DoubleSide});
+    const szMat=new THREE.MeshBasicMaterial({color:theme.whiteMark,opacity:SAFE_ZONE_OPACITY,transparent:true,depthWrite:false,side:THREE.DoubleSide});
     for(const {tx1,ty1,tx2,ty2} of szSel){
       const p1=tileCenter(tx1,ty1),p2=tileCenter(tx2,ty2);
       const wL=p1.x+TILE*0.5,wR=p2.x-TILE*0.5,wT=p1.z+TILE*0.5,wB=p2.z-TILE*0.5;
@@ -685,17 +849,16 @@ export function buildScene(mapModule){
       szBA.push({x:wR-CR,z:wB-CR,rot:0});
       szBA.push({x:wL+CR,z:wB-CR,rot:-Math.PI/2});
       // inward hatching on all 4 sides
-      const d45=HL*0.5*Math.SQRT1_2;
       const nX=Math.max(1,Math.round(iW/HG)), nZ=Math.max(1,Math.round(iD/HG));
       for(let i=0;i<nX;i++){
         const hx=wL+CR+(i+0.5)*iW/nX;
-        szHM.push({x:hx,z:wT+BT+d45,w:HW,d:HL,rot:Math.PI/4});
-        szHM.push({x:hx,z:wB-BT-d45,w:HW,d:HL,rot:Math.PI/4});
+        szHM.push({x:hx,z:wT+HO,w:HW,d:HL,rot:Math.PI/4});
+        szHM.push({x:hx,z:wB-HO,w:HW,d:HL,rot:Math.PI/4});
       }
       for(let i=0;i<nZ;i++){
         const hz=wT+CR+(i+0.5)*iD/nZ;
-        szHM.push({x:wL+BT+d45,z:hz,w:HW,d:HL,rot:Math.PI/4});
-        szHM.push({x:wR-BT-d45,z:hz,w:HW,d:HL,rot:Math.PI/4});
+        szHM.push({x:wL+HO,z:hz,w:HW,d:HL,rot:Math.PI/4});
+        szHM.push({x:wR-HO,z:hz,w:HW,d:HL,rot:Math.PI/4});
       }
     }
     function makeSzMarks(list){
@@ -799,7 +962,6 @@ export function buildScene(mapModule){
       const lz = z + (alongX?0:side*STREET_LIGHT_ARM);
       const ax = (x+lx)*0.5;
       const az = (z+lz)*0.5;
-      streetLightPositions.push({x:lx,z:lz});
 
       D.rotation.set(0,0,0);
       D.position.set(x,3.65,z);
@@ -821,7 +983,9 @@ export function buildScene(mapModule){
 
       D.rotation.set(-Math.PI/2,0,0);
       D.position.set(lx,0.518,lz);
-      D.scale.set(TILE*1.84,TILE*1.84,1);
+      const glowScale = STREET_LIGHT_GLOW_SCALE
+        * (1 + (hash2(Math.floor(lx/TILE)+17,Math.floor(lz/TILE)+23)-0.5)*STREET_LIGHT_GLOW_SCALE_RANDOM);
+      D.scale.set(glowScale,glowScale,1);
       D.updateMatrix();
       glows.setMatrixAt(i,D.matrix);
     });
@@ -831,14 +995,6 @@ export function buildScene(mapModule){
       scene.add(m);
       streetLightMeshes.push(m);
     });
-
-    for(let i=0;i<STREET_LIGHT_POOL_SIZE;i++){
-      const l=new THREE.PointLight(0xffd18a,3.8,TILE*5.2,1.35);
-      l.position.y=7.2;
-      l.visible=false;
-      scene.add(l);
-      streetPointLights.push(l);
-    }
   }
 
   // Car spawn

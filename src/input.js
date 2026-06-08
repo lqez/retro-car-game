@@ -3,8 +3,12 @@ import { JOY_RADIUS as JOY_R, JOY_HOLD_MS, DOUBLE_TAP_MS } from './constants.js'
 // ─── keyboard ──────────────────────────────────────────────────────────────
 export const keys={};
 window.addEventListener('keydown',e=>{
-  if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space'].includes(e.code))e.preventDefault();
-  if(e.code==='Space' && !e.repeat) requestGas();
+  const buttonLike = e.target?.closest?.('button,a,input,select,textarea,[role="button"]');
+  if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code))e.preventDefault();
+  if(e.code==='Space' && getGameOn() && !buttonLike){
+    e.preventDefault();
+    if(!e.repeat) requestGas();
+  }
   keys[e.code]=true;
 });
 window.addEventListener('keyup',e=>{keys[e.code]=false;});

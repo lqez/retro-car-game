@@ -9,6 +9,32 @@
 export const TILE = 12;
 export const T = Object.freeze({ ROAD: 0, BUILDING: 1, PARK: 2, WATER: 3, BRIDGE: 4 });
 
+// ─── Paris landmark palette ─────────────────────────────────────────────────
+export const PARIS_LANDMARK_COLORS = Object.freeze({
+  limestone: 0xb8ad98,
+  limestoneLight: 0xd0c7b4,
+  limestoneDark: 0x918572,
+  agedStone: 0xa99176,
+  slate: 0x5e6870,
+  slateDark: 0x3f484f,
+  shadow: 0x242321,
+  glass: 0x7390a0,
+  glassDark: 0x3f5964,
+  copperGreen: 0x51725d,
+  gold: 0xb8902f,
+  sacreWhite: 0xded9cc,
+  sacreShade: 0xbdb5a4,
+  pompidouWhite: 0xd7d9d3,
+  pompidouSteel: 0x8d9698,
+  pipeBlue: 0x315d8f,
+  pipeRed: 0x963027,
+  pipeYellow: 0xa07828,
+  pipeGreen: 0x3f7054,
+  rougeRed: 0x8c2027,
+  rougeTrim: 0x302127,
+  rougeCream: 0xb7a365,
+});
+
 // ─── player car ─────────────────────────────────────────────────────────────
 export const CONST_SPEED       = 55;           // base driving speed (world units/s)
 export const CAR_HL            = TILE * 0.5;   // collision half-length
@@ -32,6 +58,28 @@ export const MAX_CAM_TILT     = 0.05;      // radians view roll on turn
 export const CAM_TILT_LERP    = 3;         // camera-roll follow speed
 export const BARREL_K         = 0.28;      // barrel (fisheye) distortion strength
 export const FOG_NEAR = 200, FOG_FAR = 440;
+
+// ─── building windows ───────────────────────────────────────────────────────
+export const BUILDING_WINDOW_LIT_CHANCE = 0.28;
+export const BUILDING_WINDOW_LIT_TEMPERATURES = Object.freeze([3000, 4000, 5000, 6000]);
+export const BUILDING_DAY_WINDOW_COLORS = Object.freeze([0x526975, 0x607986, 0x6d838c, 0x596d73]);
+export const BUILDING_WINDOW_WIDTH_MIN = TILE * 0.12;
+export const BUILDING_WINDOW_WIDTH_BIG_BONUS = TILE * 0.15;
+export const BUILDING_WINDOW_WIDTH_RANDOM = TILE * 0.43;
+export const BUILDING_WINDOW_HEIGHT_MIN = 0.72;
+export const BUILDING_WINDOW_HEIGHT_TALL_BONUS = 1.35;
+export const BUILDING_WINDOW_HEIGHT_RANDOM = 3.72;
+export const BUILDING_WINDOW_CELL_FILL = 0.84;
+export const BUILDING_WINDOW_SPAN_MIN = 0.92;
+export const BUILDING_WINDOW_SPAN_RANDOM = 0.17;
+export const BUILDING_WINDOW_SPAN_BIG_BONUS = 0.07;
+
+// ─── road markings ─────────────────────────────────────────────────────────
+export const SAFE_ZONE_OPACITY = 0.3;
+
+// ─── street lights ──────────────────────────────────────────────────────────
+export const STREET_LIGHT_GLOW_SCALE = TILE * 1.84;
+export const STREET_LIGHT_GLOW_SCALE_RANDOM = 0.34;
 
 // ─── road bump (occasional visual-only jolts while driving) ───────────────────
 export const BUMP_AMP         = TILE * 0.007;
@@ -57,12 +105,30 @@ export const GAS_FADE_T  = 0.6;            // quick fade-out after hold
 export const GAS_STUN_PAD = TILE * 0.25;   // extra contact radius for enemy bodies
 export const GAS_Y       = 1.1;            // cloud height off the ground
 
+// ─── diamonds / collection effects ───────────────────────────────────────────
+export const DIAMOND_COLLECT_DIST = TILE * 0.58;
+export const DIAMOND_FLOAT_Y      = TILE * 0.55;
+export const DIAMOND_SPAWN_CLEAR  = 6;              // min Manhattan tile distance from car spawn
+export const DIAMOND_GEM_OPACITY  = 0.92;
+export const DIAMOND_CORE_OPACITY = 0.42;
+export const DIAMOND_GLOW_OPACITY = 0.18;
+export const DIAMOND_POP_DURATION = 0.26;           // seconds for scale-up burst
+export const DIAMOND_POP_SCALE    = 2.05;           // peak scale during pop
+export const DIAMOND_BURST_COUNT  = 14;
+export const DIAMOND_BURST_SPEED  = TILE * 3.1;
+export const DIAMOND_BURST_LIFE   = 0.48;
+export const DIAMOND_BURST_RADIUS = TILE * 0.05;
+export const DIAMOND_RING_INNER_R = TILE * 0.20;
+export const DIAMOND_RING_OUTER_R = TILE * 0.32;
+export const DIAMOND_RING_LIFE    = 0.34;
+export const DIAMOND_RING_SCALE   = 1.9;
+
 // ─── enemies ────────────────────────────────────────────────────────────────────
 export const ENEMY_COUNT          = 8;
-export const ENEMY_SPEED          = 0.92;        // fraction of player speed
-export const ENEMY_TERRITORY_R    = 18;          // max Manhattan tiles from home while chasing
-export const ENEMY_DETECT_DIST    = TILE * 14;   // world-unit radius to start chasing
-export const ENEMY_THINK_INTERVAL = 0.5;         // seconds between direction decisions
+export const ENEMY_SPEED          = 0.95;        // fraction of player speed
+export const ENEMY_TERRITORY_R    = 20;          // max Manhattan tiles from home while chasing
+export const ENEMY_DETECT_DIST    = TILE * 12;   // world-unit radius to start chasing
+export const ENEMY_THINK_INTERVAL = 0.4;         // seconds between direction decisions
 export const ENEMY_COLLIDE_DIST   = TILE * 0.82; // center-to-center game-over trigger
 export const ENEMY_SPAWN_CLEAR    = 10;          // min Manhattan tiles from player spawn
 export const ENEMY_STUN_TIME      = 3.0;         // seconds frozen after touching gas

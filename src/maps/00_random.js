@@ -3,17 +3,17 @@ import { MAP_W, MAP_H, HALF_W, HALF_H,
          tileMap, waterMrk, bldgH, bldgStyle, bldgW, bldgD, parkShade,
          initMap, rngSeed, rng, mi, hash2, fillRect, pruneOrphanRoads } from '../map.js';
 
-const MIN_MAP_SIZE = 40;
-const MAX_MAP_SIZE = 96;
-const MAP_SIZE_STEP = 2;
+const MIN_MAP_SIZE = 32;
+const MAX_MAP_SIZE = 72;
+const MAP_SIZE_STEP = 4;
 const THEMES = ['day', 'night'];
 
 export let mapW = 64, mapH = 64;
 export const hasLandmarks = false;
 export let theme = 'day';
 export let gameplay = Object.freeze({
-  enemyCount: 6,
-  diamondCount: 6,
+  enemyCount: 10,
+  diamondCount: 10,
   timeLimit: 75,
 });
 
@@ -25,9 +25,9 @@ function randomMapSize() {
 function gameplayForSize(size) {
   const t = (size - MIN_MAP_SIZE) / (MAX_MAP_SIZE - MIN_MAP_SIZE);
   return Object.freeze({
-    enemyCount: Math.round(4 + t * 8),
-    diamondCount: Math.round(5 + t * 9),
-    timeLimit: Math.round(60 + t * 70),
+    enemyCount: Math.round(6 + t * 8),
+    diamondCount: Math.round(6 + t * 9),
+    timeLimit: Math.round(40 + t * 70),
   });
 }
 
