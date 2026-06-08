@@ -146,18 +146,22 @@ function tick(){
     cameraLead.lerp(targetCameraLead, 1-Math.exp(-2.4*dt));
     setTopCamera(tgtX,tgtZ);
 
-    // ── diamonds + enemies ────────────────────────────────────────────────────────────
+    // ── diamonds: always update so pop animation plays through game-over ──────────────
+    updateDiamonds(dt, carGroup.position.x, carGroup.position.z);
+
+    // ── enemies: always update so they keep driving after game-over ───────────────────
+    const enemyHit = updateEnemies(dt, carGroup.position.x, carGroup.position.z);
+
+    // ── win / lose checks (PLAYING only) ─────────────────────────────────────────────
     if(_gState===GameState.PLAYING){
-      updateDiamonds(dt, carGroup.position.x, carGroup.position.z);
       if(totalCount>0 && collectedCount>=totalCount) winRound();
-      if(updateEnemies(dt, carGroup.position.x, carGroup.position.z)) loseRound();
+      if(enemyHit) loseRound();
     }
 
-    // ── update game state (timer) ──────────────────────────────────────────────────
+    // ── update game state (timer) + HUD (PLAYING only) ───────────────────────────────
     if(_gState===GameState.PLAYING){
       updateState(dt);
 
-      // HUD
       const _dirX=dirX, _dirZ=dirZ;
       const dirArrow=_dirX>0?'→':_dirX<0?'←':_dirZ<0?'↑':'↓';
       updateHUD(dirArrow);
