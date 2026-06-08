@@ -126,7 +126,7 @@ export const DIAMOND_RING_SCALE   = 1.9;
 // ─── enemies ────────────────────────────────────────────────────────────────────
 export const ENEMY_COUNT          = 8;
 export const ENEMY_SPEED          = 0.90;        // fraction of player speed
-export const ENEMY_TERRITORY_R    = 18;          // max Manhattan tiles from home while chasing
+export const ENEMY_TERRITORY_R    = 24;          // max Manhattan tiles from home while chasing
 export const ENEMY_DETECT_DIST    = TILE * 12;   // world-unit radius to start chasing
 export const ENEMY_THINK_INTERVAL = 0.5;         // seconds between direction decisions
 export const ENEMY_COLLIDE_DIST   = TILE * 0.82; // center-to-center game-over trigger
@@ -168,24 +168,36 @@ export const CRASH_DUST_BURST = Object.freeze({
 });
 export const EXPLOSION_FIRE_COLORS = Object.freeze([0xffd94a, 0xffaa22, 0xff6a1f, 0xff2f18]);
 export const EXPLOSION_SMOKE_COLOR = 0x15110f;
+export const EXPLOSION_BLAST_COLORS = Object.freeze([0xff2f18, 0xff6a1f, 0xffaa22, 0xffd94a]);
 export const EXPLOSION_BURST = Object.freeze({
   sparkCount: 36,
-  sparkScale: 0.45,
-  sparkSpeedBase: 10,
-  sparkSpeedRandom: 24,
+  sparkScaleMin: 0.42,
+  sparkScaleMax: 1.15,
+  sparkScaleLargeChance: 0.22,
+  sparkLargeScaleMin: 1.1,
+  sparkLargeScaleMax: 1.85,
+  sparkSpeedBase: 14,
+  sparkSpeedRandom: 34,
   sparkUpBase: 10,
   sparkUpRandom: 26,
-  sparkLifeBase: 0.28,
-  sparkLifeRandom: 0.38,
-  smokeCount: 10,
+  sparkLifeBase: 1.5,
+  sparkLifeRandom: 0.85,
+  smokeCount: 14,
   smokeLife: 2.0,
   smokeSpeedBase: 0.4,
   smokeSpeedRandom: 2.2,
-  smokeUpBase: 8,
-  smokeUpRandom: 5,
+  smokeUpBase: 6,
+  smokeUpRandom: 4,
   smokeStartScale: 0.55,
-  smokeGrowScale: 8.0,
-  smokeOpacity: 0.36,
+  smokeGrowScale: 9.5,
+  smokeOpacity: 0.44,
+  blastPool: 24,
+  blastCount: 5,
+  blastLife: 0.42,
+  blastMajorRadius: TILE * 1.0,
+  blastMinorRadius: TILE * 0.42,
+  blastGrowScale: 1.85,
+  blastOpacity: 0.46,
 });
 
 // ─── input feel ────────────────────────────────────────────────────────────────

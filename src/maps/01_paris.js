@@ -6,7 +6,7 @@ import { MAP_W, MAP_H, HALF_W, HALF_H,
 export const mapW = 80, mapH = 80;
 export const hasLandmarks = true;
 export const gameplay = Object.freeze({
-  enemyCount: 14,
+  enemyCount: 16,
   diamondCount: 12,
   timeLimit: 80,
 });

@@ -99,6 +99,34 @@ function validDirsAt(x, z) {
   return DIRS.filter(([dx,dz]) => clearForDir(x,z,dx,dz) && leadingClearForDir(x,z,dx,dz));
 }
 
+function directionIsOpen(e, dx, dz, dt) {
+  const lookAhead = Math.max(CONST_SPEED * ENEMY_SPEED * dt, TILE * 0.5);
+  const nx = e.x + dx * lookAhead;
+  const nz = e.z + dz * lookAhead;
+  return leadingClearForDir(nx, nz, dx, dz);
+}
+
+function chooseBestDir(e, dt, scoreDir) {
+  let best = null;
+  let bestScore = -Infinity;
+
+  for (const [dx, dz] of DIRS) {
+    if (!directionIsOpen(e, dx, dz, dt)) continue;
+
+    let score = scoreDir(dx, dz);
+    if (dx === e.dx && dz === e.dz) score += 0.25;
+    if (dx === -e.dx && dz === -e.dz) score -= 0.35;
+    score += Math.random() * 0.01;
+
+    if (score > bestScore) {
+      bestScore = score;
+      best = [dx, dz];
+    }
+  }
+
+  return best ?? [e.dx, e.dz];
+}
+
 function shuffle(items) {
   for (let i = items.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
@@ -287,26 +315,27 @@ export function updateEnemies(dt, carX, carZ, chase = true) {
 
       if (canChase) {
         const ddx = carX - e.x, ddz = carZ - e.z;
-        // 25% chance of picking the wrong axis (dumb mistake)
-        const pickMinor = Math.random() < 0.25;
-        if (pickMinor
-          ? Math.abs(ddx) < Math.abs(ddz)
-          : Math.abs(ddx) >= Math.abs(ddz)
-        ) { wantDx = ddx > 0 ? 1 : -1; wantDz = 0; }
-        else { wantDx = 0; wantDz = ddz > 0 ? 1 : -1; }
+        [wantDx, wantDz] = chooseBestDir(e, dt, (dx, dz) => {
+          const nextX = e.x + dx * TILE;
+          const nextZ = e.z + dz * TILE;
+          return -Math.hypot(carX - nextX, carZ - nextZ)
+            + (Math.sign(ddx) === dx ? 0.18 : 0)
+            + (Math.sign(ddz) === dz ? 0.18 : 0);
+        });
 
       } else if (!inTerritory) {
         // return home
         const dhx = e.homeTx - curTx, dhz = e.homeTy - curTy;
-        if (Math.abs(dhx) >= Math.abs(dhz)) { wantDx = dhx > 0 ? 1 : -1; wantDz = 0; }
-        else                                 { wantDx = 0; wantDz = dhz > 0 ? 1 : -1; }
+        [wantDx, wantDz] = chooseBestDir(e, dt, (dx, dz) =>
+          -tileDist(curTx + dx, curTy + dz, e.homeTx, e.homeTy)
+          + (Math.sign(dhx) === dx ? 0.15 : 0)
+          + (Math.sign(dhz) === dz ? 0.15 : 0)
+        );
       }
       // else patrol: keep current direction; wall-avoidance handles turns
 
       if (wantDx !== e.dx || wantDz !== e.dz) {
-        const nx = e.x + wantDx * CONST_SPEED * ENEMY_SPEED * dt;
-        const nz = e.z + wantDz * CONST_SPEED * ENEMY_SPEED * dt;
-        if (leadingClearForDir(nx, nz, wantDx, wantDz)) {
+        if (directionIsOpen(e, wantDx, wantDz, dt)) {
           e.dx = wantDx; e.dz = wantDz;
         }
       }

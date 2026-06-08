@@ -4,7 +4,7 @@ export const mapW = 80, mapH = 80;
 export const hasLandmarks = true;
 export const theme = 'night';
 export const gameplay = Object.freeze({
-  enemyCount: 20,
+  enemyCount: 24,
   diamondCount: 10,
   timeLimit: 100,
 });

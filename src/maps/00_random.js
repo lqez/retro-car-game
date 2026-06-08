@@ -3,7 +3,7 @@ import { MAP_W, MAP_H, HALF_W, HALF_H,
          tileMap, waterMrk, bldgH, bldgStyle, bldgW, bldgD, parkShade,
          initMap, rngSeed, rng, mi, hash2, fillRect, pruneOrphanRoads } from '../map.js';
 
-const MIN_MAP_SIZE = 32;
+const MIN_MAP_SIZE = 48;
 const MAX_MAP_SIZE = 72;
 const MAP_SIZE_STEP = 4;
 const THEMES = ['day', 'night'];
