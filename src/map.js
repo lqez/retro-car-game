@@ -339,6 +339,8 @@ export function buildParis(){
   lmk(70,23,4,4);
   // Les Invalides (4×4 at x=42-45, y=82-85; world cx=-240, cz=240)
   lmk(42,82,4,4);
+  // Centre Pompidou (3×3 at x=76-78, y=65-67; world cx=162, cz=30)
+  lmk(76,65,3,3);
   // (sub-agents append lmk() calls here — one per landmark)
   // === END LANDMARK TILE RESERVATIONS ===
 

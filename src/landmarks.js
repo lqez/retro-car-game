@@ -32,6 +32,7 @@ export function buildLandmarks() {
   buildLouvre();
   buildOperaGarnier();
   buildInvalides();
+  buildPompidou();
 }
 
 function buildArcDeTriomphe() {
@@ -559,6 +560,124 @@ function buildInvalides() {
   );
   rightArch.position.set(cx + 10, 7, cz - 18);
   add(rightArch);
+}
+
+function buildPompidou() {
+  // World center: cx=162, cz=30 (tiles x=76-78, y=65-67, 3×3 block)
+  const cx = 162;
+  const cz = 30;
+  const PI = Math.PI;
+
+  // 1. Main building body
+  const body = new THREE.Mesh(
+    new THREE.BoxGeometry(30, 20, 30),
+    new THREE.MeshToonMaterial({ color: 0x889099 })
+  );
+  body.position.set(cx, 10, cz);
+  body.castShadow = true;
+  body.receiveShadow = true;
+  add(body);
+
+  // 2. White structural frame (top edge cap)
+  const frame = new THREE.Mesh(
+    new THREE.BoxGeometry(32, 2, 32),
+    new THREE.MeshToonMaterial({ color: 0xdddddd })
+  );
+  frame.position.set(cx, 21, cz);
+  frame.castShadow = true;
+  add(frame);
+
+  // 3. Blue water pipes — south face y=5
+  const bluePipeS5 = new THREE.Mesh(
+    new THREE.CylinderGeometry(1.8, 1.8, 30, 8),
+    new THREE.MeshToonMaterial({ color: 0x1155cc })
+  );
+  bluePipeS5.rotation.z = PI / 2;
+  bluePipeS5.position.set(cx, 5, cz - 16);
+  add(bluePipeS5);
+
+  // Blue water pipes — south face y=13
+  const bluePipeS13 = new THREE.Mesh(
+    new THREE.CylinderGeometry(1.8, 1.8, 30, 8),
+    new THREE.MeshToonMaterial({ color: 0x1155cc })
+  );
+  bluePipeS13.rotation.z = PI / 2;
+  bluePipeS13.position.set(cx, 13, cz - 16);
+  add(bluePipeS13);
+
+  // Blue water pipes — north face y=5
+  const bluePipeN5 = new THREE.Mesh(
+    new THREE.CylinderGeometry(1.8, 1.8, 30, 8),
+    new THREE.MeshToonMaterial({ color: 0x1155cc })
+  );
+  bluePipeN5.rotation.z = PI / 2;
+  bluePipeN5.position.set(cx, 5, cz + 16);
+  add(bluePipeN5);
+
+  // Blue water pipes — north face y=13
+  const bluePipeN13 = new THREE.Mesh(
+    new THREE.CylinderGeometry(1.8, 1.8, 30, 8),
+    new THREE.MeshToonMaterial({ color: 0x1155cc })
+  );
+  bluePipeN13.rotation.z = PI / 2;
+  bluePipeN13.position.set(cx, 13, cz + 16);
+  add(bluePipeN13);
+
+  // 4. Red air-conditioning pipes — east face (vertical)
+  const redPipeL = new THREE.Mesh(
+    new THREE.CylinderGeometry(1.5, 1.5, 22, 8),
+    new THREE.MeshToonMaterial({ color: 0xcc2211 })
+  );
+  redPipeL.position.set(cx - 16, 11, cz - 8);
+  add(redPipeL);
+
+  const redPipeR = new THREE.Mesh(
+    new THREE.CylinderGeometry(1.5, 1.5, 22, 8),
+    new THREE.MeshToonMaterial({ color: 0xcc2211 })
+  );
+  redPipeR.position.set(cx - 16, 11, cz + 8);
+  add(redPipeR);
+
+  // 5. Yellow electrical conduit — west face (vertical)
+  const yellowPipeL = new THREE.Mesh(
+    new THREE.CylinderGeometry(1, 1, 22, 8),
+    new THREE.MeshToonMaterial({ color: 0xddaa11 })
+  );
+  yellowPipeL.position.set(cx + 16, 11, cz - 6);
+  add(yellowPipeL);
+
+  const yellowPipeC = new THREE.Mesh(
+    new THREE.CylinderGeometry(1, 1, 22, 8),
+    new THREE.MeshToonMaterial({ color: 0xddaa11 })
+  );
+  yellowPipeC.position.set(cx + 16, 11, cz);
+  add(yellowPipeC);
+
+  const yellowPipeR = new THREE.Mesh(
+    new THREE.CylinderGeometry(1, 1, 22, 8),
+    new THREE.MeshToonMaterial({ color: 0xddaa11 })
+  );
+  yellowPipeR.position.set(cx + 16, 11, cz + 6);
+  add(yellowPipeR);
+
+  // 6. Green pipes — diagonal cross-brace on south face
+  const greenPipe = new THREE.Mesh(
+    new THREE.CylinderGeometry(1, 1, 22, 6),
+    new THREE.MeshToonMaterial({ color: 0x2d7733 })
+  );
+  greenPipe.rotation.z = PI * 0.25;
+  greenPipe.position.set(cx, 10, cz - 16);
+  add(greenPipe);
+
+  // 7. External escalator tube — diagonal glass tube on south face
+  const escalator = new THREE.Mesh(
+    new THREE.CylinderGeometry(2.5, 2.5, 26, 8),
+    new THREE.MeshToonMaterial({ color: 0xaaccee, transparent: true, opacity: 0.7 })
+  );
+  escalator.rotation.z = -PI * 0.35;
+  escalator.position.set(cx + 6, 10, cz - 17);
+  escalator.castShadow = false;
+  add(escalator);
 }
 
 function buildEiffelTower() {
