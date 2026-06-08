@@ -54,59 +54,64 @@ export function resetMap(){
 export function buildRandom(){
   _s = (Date.now() ^ (Math.random() * 0xffffffff)) >>> 0;
 
+  const RW=64, RH=64;
+  const OX=(MAP_W-RW)>>1, OY=(MAP_H-RH)>>1; // centre the 64×64 area in the 128×128 map
+
   for(let i=0;i<5;i++){
     if(rng()<0.5){
-      const wy=12+Math.floor(rng()*(MAP_H-24));
+      const wy=OY+2+Math.floor(rng()*(RH-4));
       const ww=2+Math.floor(rng()*3);
-      fillRect(0,wy,MAP_W,ww,T.WATER); fillRect(0,wy,MAP_W,ww,1,waterMrk);
+      fillRect(OX,wy,RW,ww,T.WATER); fillRect(OX,wy,RW,ww,1,waterMrk);
     }else{
-      const wx=12+Math.floor(rng()*(MAP_W-24));
+      const wx=OX+2+Math.floor(rng()*(RW-4));
       const ww=2+Math.floor(rng()*3);
-      fillRect(wx,0,ww,MAP_H,T.WATER); fillRect(wx,0,ww,MAP_H,1,waterMrk);
+      fillRect(wx,OY,ww,RH,T.WATER); fillRect(wx,OY,ww,RH,1,waterMrk);
     }
   }
-  for(let y=4;y<MAP_H-4;){
+  for(let y=OY+4;y<OY+RH-4;){
     const w=[1,1,2,2,3,4][Math.floor(rng()*6)];
-    fillRect(0,y,MAP_W,w,T.ROAD);
+    fillRect(OX,y,RW,w,T.ROAD);
     y+=w+7+Math.floor(rng()*11);
   }
-  for(let x=4;x<MAP_W-4;){
+  for(let x=OX+4;x<OX+RW-4;){
     const w=[1,1,2,2,3,4][Math.floor(rng()*6)];
-    fillRect(x,0,w,MAP_H,T.ROAD);
+    fillRect(x,OY,w,RH,T.ROAD);
     x+=w+7+Math.floor(rng()*11);
   }
-  fillRect(HALF_W-1,0,3,MAP_H,T.ROAD);
-  fillRect(0,HALF_H-1,MAP_W,3,T.ROAD);
+  fillRect(HALF_W-1,OY,3,RH,T.ROAD);
+  fillRect(OX,HALF_H-1,RW,3,T.ROAD);
 
   for(let i=0;i<45;i++){
     const horizontal=rng()<0.5;
     const len=4+Math.floor(rng()*8);
     const w=1+Math.floor(rng()*2);
-    const x=3+Math.floor(rng()*(MAP_W-6));
-    const y=3+Math.floor(rng()*(MAP_H-6));
+    const x=OX+3+Math.floor(rng()*(RW-6));
+    const y=OY+3+Math.floor(rng()*(RH-6));
     if(Math.abs(x-HALF_W)<4&&Math.abs(y-HALF_H)<4)continue;
-    if(horizontal) fillRect(x,y,Math.min(len,MAP_W-x-2),w,T.BUILDING);
-    else fillRect(x,y,w,Math.min(len,MAP_H-y-2),T.BUILDING);
+    if(horizontal) fillRect(x,y,Math.min(len,OX+RW-x-2),w,T.BUILDING);
+    else fillRect(x,y,w,Math.min(len,OY+RH-y-2),T.BUILDING);
   }
 
   for(let i=0;i<55;i++){
     const horizontal=rng()<0.5;
     const len=8+Math.floor(rng()*16);
     const w=1+Math.floor(rng()*2);
-    const x=2+Math.floor(rng()*(MAP_W-4));
-    const y=2+Math.floor(rng()*(MAP_H-4));
-    if(horizontal) fillRect(x,y,Math.min(len,MAP_W-x-1),w,T.ROAD);
-    else fillRect(x,y,w,Math.min(len,MAP_H-y-1),T.ROAD);
+    const x=OX+2+Math.floor(rng()*(RW-4));
+    const y=OY+2+Math.floor(rng()*(RH-4));
+    if(horizontal) fillRect(x,y,Math.min(len,OX+RW-x-1),w,T.ROAD);
+    else fillRect(x,y,w,Math.min(len,OY+RH-y-1),T.ROAD);
   }
 
-  fillRect(HALF_W-1,0,3,MAP_H,T.ROAD);
-  fillRect(0,HALF_H-1,MAP_W,3,T.ROAD);
-  for(let i=0;i<MAP_W*MAP_H;i++)
+  fillRect(HALF_W-1,OY,3,RH,T.ROAD);
+  fillRect(OX,HALF_H-1,RW,3,T.ROAD);
+  for(let ty=OY;ty<OY+RH;ty++) for(let tx=OX;tx<OX+RW;tx++){
+    const i=mi(tx,ty);
     if(tileMap[i]===T.ROAD&&waterMrk[i])tileMap[i]=T.BRIDGE;
+  }
 
-  // ── large solid parks (green blocks) ───────────────────────────────────────────────
+  // ── large solid parks ────────────────────────────────────────────────────────────────
   for(let i=0;i<14;i++){
-    const px=4+Math.floor(rng()*(MAP_W-16)),py=4+Math.floor(rng()*(MAP_H-16));
+    const px=OX+4+Math.floor(rng()*(RW-16)),py=OY+4+Math.floor(rng()*(RH-16));
     const pw=4+Math.floor(rng()*9),ph=4+Math.floor(rng()*9);
     let ok=true;
     const shade=Math.floor(rng()*6);
@@ -115,28 +120,24 @@ export function buildRandom(){
     if(ok){
       for(let dy=0;dy<ph;dy++) for(let dx=0;dx<pw;dx++){
         const id=mi(px+dx,py+dy);
-        tileMap[id]=T.PARK;
-        parkShade[id]=shade;
+        tileMap[id]=T.PARK; parkShade[id]=shade;
       }
     }
   }
 
-  // ── scattered greenery in "green districts" (mixed building + park areas) ──
-  for(let ty=0;ty<MAP_H;ty++) for(let tx=0;tx<MAP_W;tx++){
+  // ── scattered greenery ───────────────────────────────────────────────────────────────
+  for(let ty=OY;ty<OY+RH;ty++) for(let tx=OX;tx<OX+RW;tx++){
     const id=mi(tx,ty);
     if(tileMap[id]!==T.BUILDING)continue;
     const dX=Math.floor(tx/16), dY=Math.floor(ty/16);
     if(hash2(dX+50,dY+90)<0.6)continue;
     const patch=hash2((tx>>1)+7,(ty>>1)+3)*0.55 + hash2(tx,ty)*0.45;
-    if(patch>0.58){
-      tileMap[id]=T.PARK;
-      parkShade[id]=Math.floor(hash2(tx>>2,ty>>2) * 6);
-    }
+    if(patch>0.58){ tileMap[id]=T.PARK; parkShade[id]=Math.floor(hash2(tx>>2,ty>>2)*6); }
   }
 
-  // ── larger guaranteed parks (8-18 tiles) ────────────────────────────────────────────
+  // ── larger guaranteed parks ──────────────────────────────────────────────────────────
   for(let i=0;i<8;i++){
-    const px=4+Math.floor(rng()*(MAP_W-22)), py=4+Math.floor(rng()*(MAP_H-22));
+    const px=OX+4+Math.floor(rng()*(RW-22)), py=OY+4+Math.floor(rng()*(RH-22));
     const pw=8+Math.floor(rng()*10), ph=8+Math.floor(rng()*10);
     const shade=Math.floor(rng()*6);
     let ok=true;
@@ -150,7 +151,7 @@ export function buildRandom(){
     }
   }
 
-  // ── greedy rectangle tiling ────────────────────────────────────────────────────────
+  // ── greedy rectangle tiling ───────────────────────────────────────────────────────────
   const free=(x,y)=> x>=0&&y>=0&&x<MAP_W&&y<MAP_H&&
                      tileMap[mi(x,y)]===T.BUILDING&&bldgW[mi(x,y)]===0;
   function claim(bx,by){
@@ -167,17 +168,17 @@ export function buildRandom(){
     for(let dy=0;dy<d;dy++) for(let dx=0;dx<w;dx++)
       if(dx!==0||dy!==0) bldgW[mi(bx+dx,by+dy)]=255;
   }
-  for(let ty=0;ty<MAP_H;ty++) for(let tx=0;tx<MAP_W;tx++) claim(tx,ty);
+  for(let ty=OY;ty<OY+RH;ty++) for(let tx=OX;tx<OX+RW;tx++) claim(tx,ty);
 
   // ── height + style ────────────────────────────────────────────────────────────────────
-  for(let ty=0;ty<MAP_H;ty++) for(let tx=0;tx<MAP_W;tx++){
+  for(let ty=OY;ty<OY+RH;ty++) for(let tx=OX;tx<OX+RW;tx++){
     const id=mi(tx,ty);
     if(tileMap[id]!==T.BUILDING||bldgW[id]===255)continue;
     if(bldgW[id]===0){bldgW[id]=1; bldgD[id]=1;}
 
     const fx=(tx-HALF_W)/HALF_W, fy=(ty-HALF_H)/HALF_H;
     const center=Math.max(0,1-Math.hypot(fx,fy));
-    const districtX=Math.floor(tx/16), districtY=Math.floor(ty/16);
+    const districtX=Math.floor(tx/8), districtY=Math.floor(ty/8);
     const districtNoise=hash2(districtX,districtY);
     const localNoise=hash2(tx,ty);
     const big=bldgW[id]>1||bldgD[id]>1;
