@@ -33,9 +33,9 @@
   .charBtn.active{background:rgba(100,220,255,.25);border-color:#64dcff;box-shadow:0 0 16px rgba(100,220,255,.5);}
 
   /* ── map cards ───────────────────────────────────────────────── */
-  .mapCard{display:flex;flex-direction:column;align-items:center;gap:7px;padding:12px 14px 13px;border:2px solid rgba(255,212,0,.35);border-radius:14px;background:rgba(255,212,0,.07);color:#ffd400;cursor:pointer;transition:background .15s,transform .12s,border-color .15s;width:110px;}
-  .mapCard .mapEmoji{font-size:2.6rem;line-height:1.1;}
-  .mapCard .mapName{font-size:clamp(.88rem,2.4vw,1rem);font-weight:800;}
+  .mapCard{display:flex;flex-direction:column;align-items:center;gap:6px;padding:8px 10px 10px;border:2px solid rgba(255,212,0,.35);border-radius:14px;background:rgba(255,212,0,.07);color:#ffd400;cursor:pointer;transition:background .15s,transform .12s,border-color .15s;width:96px;}
+  .mapCard img{width:80px;height:80px;object-fit:contain;display:block;pointer-events:none;}
+  .mapCard .mapName{font-size:clamp(.82rem,2.2vw,.95rem);font-weight:800;line-height:1;}
   .mapCard:hover,.mapCard:active{background:rgba(255,212,0,.18);transform:scale(.96);}
   .mapCard.active{background:rgba(255,212,0,.22);border-color:#ffd400;box-shadow:0 0 16px rgba(255,212,0,.5);}
 
@@ -65,8 +65,8 @@
     <!-- Map selection -->
     <p class="sectionLabel">도시 선택</p>
     <div id="mapCardSelect" style="display:flex;flex-wrap:wrap;justify-content:center;gap:14px;margin-bottom:4px;">
-      <button class="mapCard" id="btnParis"><span class="mapEmoji">🗼</span><span class="mapName">Paris</span></button>
-      <button class="mapCard" id="btnRandom"><span class="mapEmoji">🎲</span><span class="mapName">Random</span></button>
+      <button class="mapCard" id="btnParis"><img src="./assets/map/image/paris.png" alt="Paris"><span class="mapName">Paris</span></button>
+      <button class="mapCard" id="btnRandom"><img src="./assets/map/image/random.png" alt="Random"><span class="mapName">Random</span></button>
     </div>
 
     <!-- Start button -->
