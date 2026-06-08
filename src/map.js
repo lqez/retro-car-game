@@ -337,6 +337,8 @@ export function buildParis(){
   lmk(65,58,4,4);
   // Opéra Garnier (4×4 at x=70-73, y=23-26; world cx=96, cz=-468)
   lmk(70,23,4,4);
+  // Les Invalides (4×4 at x=42-45, y=82-85; world cx=-240, cz=240)
+  lmk(42,82,4,4);
   // (sub-agents append lmk() calls here — one per landmark)
   // === END LANDMARK TILE RESERVATIONS ===
 

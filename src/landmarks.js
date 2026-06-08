@@ -31,6 +31,7 @@ export function buildLandmarks() {
   buildSacreCœur();
   buildLouvre();
   buildOperaGarnier();
+  buildInvalides();
 }
 
 function buildArcDeTriomphe() {
@@ -470,6 +471,94 @@ function buildOperaGarnier() {
     sculpture.castShadow = true;
     add(sculpture);
   }
+}
+
+function buildInvalides() {
+  // World center: cx=-240, cz=240 (tiles x=42-45, y=82-85, 4×4 block)
+  const cx = -240;
+  const cz = 240;
+  const PI = Math.PI;
+
+  const stoneMat  = new THREE.MeshToonMaterial({ color: 0xbca080 });
+  const roofMat   = new THREE.MeshToonMaterial({ color: 0x7a8090 });
+  const drumMat   = new THREE.MeshToonMaterial({ color: 0xd8ccb0 });
+  const goldMat   = new THREE.MeshToonMaterial({ color: 0xd4a020 });
+
+  // 1. Main long building (barracks and museum)
+  const mainBuilding = new THREE.Mesh(
+    new THREE.BoxGeometry(44, 12, 34),
+    stoneMat
+  );
+  mainBuilding.position.set(cx, 6, cz);
+  mainBuilding.castShadow = true;
+  mainBuilding.receiveShadow = true;
+  add(mainBuilding);
+
+  // 2. Roof (flat slab, slightly darker)
+  const roof = new THREE.Mesh(
+    new THREE.BoxGeometry(40, 2, 30),
+    roofMat
+  );
+  roof.position.set(cx, 13, cz);
+  add(roof);
+
+  // 3. Central connecting section (taller middle block)
+  const centralSection = new THREE.Mesh(
+    new THREE.BoxGeometry(14, 16, 34),
+    stoneMat
+  );
+  centralSection.position.set(cx, 8, cz);
+  centralSection.castShadow = true;
+  add(centralSection);
+
+  // 4. Dome drum (octagonal/circular base of the dome)
+  const domeDrum = new THREE.Mesh(
+    new THREE.CylinderGeometry(9, 10, 10, 16),
+    drumMat
+  );
+  domeDrum.position.set(cx, 21, cz);
+  domeDrum.castShadow = true;
+  add(domeDrum);
+
+  // 5. Golden dome (the most iconic feature)
+  const dome = new THREE.Mesh(
+    new THREE.SphereGeometry(9, 16, 12, 0, PI * 2, 0, PI * 0.65),
+    goldMat
+  );
+  dome.position.set(cx, 30, cz);
+  dome.castShadow = true;
+  add(dome);
+
+  // 6. Lantern (small drum on top of dome)
+  const lantern = new THREE.Mesh(
+    new THREE.CylinderGeometry(2.5, 3, 5, 12),
+    goldMat
+  );
+  lantern.position.set(cx, 40, cz);
+  add(lantern);
+
+  // 7. Golden spire/finial
+  const spire = new THREE.Mesh(
+    new THREE.CylinderGeometry(0, 2, 8, 8),
+    goldMat
+  );
+  spire.position.set(cx, 46, cz);
+  add(spire);
+
+  // 8. Front courtyard entrance arch hints (two simple arch boxes)
+  const leftArch = new THREE.Mesh(
+    new THREE.BoxGeometry(8, 14, 3),
+    stoneMat
+  );
+  leftArch.position.set(cx - 10, 7, cz - 18);
+  add(leftArch);
+
+  const rightArch = new THREE.Mesh(
+    new THREE.BoxGeometry(8, 14, 3),
+    stoneMat
+  );
+  rightArch.position.set(cx + 10, 7, cz - 18);
+  add(rightArch);
 }
 
 function buildEiffelTower() {
