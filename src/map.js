@@ -260,8 +260,17 @@ export function buildParis(){
   for(const y of smallY) for(let x=0;x<MAP_W;x++) road(x,y);
   for(const x of smallX) for(let y=0;y<MAP_H;y++) road(x,y);
 
-  // Central plaza (Arc de Triomphe area)
+  // Central plaza (Arc de Triomphe roundabout)
   for(let y=49;y<=57;y++) for(let x=59;x<=68;x++) road(x,y);
+  // Arc de Triomphe monument: override center 4×4 back to BUILDING
+  for(let y=51;y<=54;y++) for(let x=62;x<=65;x++) tileMap[mi(x,y)]=T.BUILDING;
+
+  // === EIFFEL TOWER EARLY: non-corner interior tiles → ROAD (before pruneOrphanRoads) ===
+  for(let y=82;y<=89;y++) for(let x=20;x<=27;x++){
+    const isCorner=(x<=21||x>=26)&&(y<=83||y>=88);
+    if(!isCorner) road(x,y);
+  }
+  // === END EIFFEL TOWER EARLY ===
 
   // Convert road-over-water to bridge
   for(let i=0;i<MAP_W*MAP_H;i++)
@@ -305,6 +314,39 @@ export function buildParis(){
       parkShade[id]=(hash2(Math.floor(tx/4),Math.floor(ty/4)*17)*6)|0;
     }
   }
+
+  // === LANDMARK TILE RESERVATIONS (post-park; marks bldgW=255 so tiler skips them) ===
+  function lmk(x0,y0,w,h){
+    for(let dy=0;dy<h;dy++) for(let dx=0;dx<w;dx++){
+      const x=x0+dx, y=y0+dy;
+      if(x<0||x>=MAP_W||y<0||y>=MAP_H) continue;
+      const id=mi(x,y);
+      tileMap[id]=T.BUILDING;
+      bldgW[id]=255;
+    }
+  }
+  // Arc de Triomphe monument center (4×4 at x=62-65, y=51-54; world 0,-132)
+  lmk(62,51,4,4);
+  // Eiffel Tower corner legs (2×2 each; Champ de Mars park set them to PARK, reset to BUILDING)
+  lmk(20,82,2,2); lmk(26,82,2,2); lmk(20,88,2,2); lmk(26,88,2,2);
+  // Notre-Dame Cathedral (4×3 at x=65-68, y=70-72; world cx=36, cz=90)
+  lmk(65,70,4,3);
+  // Sacré-Cœur Basilica (3×4 at x=55-57, y=18-21; world cx=-90, cz=-528)
+  lmk(55,18,3,4);
+  // Louvre Palace (4×4 at x=65-68, y=58-61; world cx=36, cz=-48)
+  lmk(65,58,4,4);
+  // Opéra Garnier (4×4 at x=70-73, y=23-26; world cx=96, cz=-468)
+  lmk(70,23,4,4);
+  // Les Invalides (4×4 at x=42-45, y=82-85; world cx=-240, cz=240)
+  lmk(42,82,4,4);
+  // Centre Pompidou (3×3 at x=76-78, y=65-67; world cx=162, cz=30)
+  lmk(76,65,3,3);
+  // Panthéon (3×4 at x=65-67, y=82-85; world cx=30, cz=240)
+  lmk(65,82,3,4);
+  // Moulin Rouge (3×3 at x=47-49, y=18-20; world cx=-186, cz=-534)
+  lmk(47,18,3,3);
+  // (sub-agents append lmk() calls here — one per landmark)
+  // === END LANDMARK TILE RESERVATIONS ===
 
   // Greedy rectangle tiling for buildings
   const free=(x,y)=> x>=0&&y>=0&&x<MAP_W&&y<MAP_H&&
