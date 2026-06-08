@@ -84,7 +84,7 @@ test('parisMap is 80×80 with landmarks', () => {
   assert.equal(parisMap.mapW, 80);
   assert.equal(parisMap.mapH, 80);
   assert.equal(parisMap.hasLandmarks, true);
-  assert.deepEqual(gameplayFor(parisMap), { enemyCount: 14, diamondCount: 12, timeLimit: 80 });
+  assert.deepEqual(gameplayFor(parisMap), { enemyCount: 16, diamondCount: 12, timeLimit: 80 });
 });
 
 test('parisNightMap is 80×80 with landmarks and night theme', () => {
@@ -92,7 +92,7 @@ test('parisNightMap is 80×80 with landmarks and night theme', () => {
   assert.equal(parisNightMap.mapH, 80);
   assert.equal(parisNightMap.hasLandmarks, true);
   assert.equal(parisNightMap.theme, 'night');
-  assert.deepEqual(gameplayFor(parisNightMap), { enemyCount: 20, diamondCount: 10, timeLimit: 100 });
+  assert.deepEqual(gameplayFor(parisNightMap), { enemyCount: 24, diamondCount: 10, timeLimit: 100 });
 });
 
 test('map gameplay falls back to default values', () => {
