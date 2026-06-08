@@ -7,9 +7,19 @@
  */
 import { build } from 'esbuild';
 import { readFile, writeFile, mkdir, rm } from 'node:fs/promises';
+import { execSync } from 'node:child_process';
 
 const OUT_DIR = 'public';
 const BUNDLE = 'assets/main.js';
+
+// Version: yyyymmdd-hhmm-serial (serial = git commit count)
+const now = new Date();
+const pad = (n, l=2) => String(n).padStart(l, '0');
+const date = `${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate())}`;
+const time = `${pad(now.getHours())}${pad(now.getMinutes())}`;
+let serial = '001';
+try { serial = pad(parseInt(execSync('git rev-list --count HEAD',{encoding:'utf8'}).trim()), 3); } catch {}
+const VERSION = `${date}-${time}-${serial}`;
 
 // Fresh output directory
 await rm(OUT_DIR, { recursive: true, force: true });
@@ -24,6 +34,7 @@ await build({
   format: 'esm',
   target: 'es2020',
   sourcemap: true,
+  define: { __APP_VERSION__: JSON.stringify(VERSION) },
 });
 
 // Emit public/index.html from the root template, swapping the importmap +
