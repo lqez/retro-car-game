@@ -329,6 +329,8 @@ export function buildParis(){
   lmk(62,51,4,4);
   // Eiffel Tower corner legs (2×2 each; Champ de Mars park set them to PARK, reset to BUILDING)
   lmk(20,82,2,2); lmk(26,82,2,2); lmk(20,88,2,2); lmk(26,88,2,2);
+  // Notre-Dame Cathedral (4×3 at x=65-68, y=70-72; world cx=36, cz=90)
+  lmk(65,70,4,3);
   // (sub-agents append lmk() calls here — one per landmark)
   // === END LANDMARK TILE RESERVATIONS ===
 

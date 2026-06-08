@@ -27,6 +27,7 @@ export function buildLandmarks() {
   // === LANDMARK BUILDERS (sub-agents append calls here) ===
   buildArcDeTriomphe();
   buildEiffelTower();
+  buildNotreDame();
 }
 
 function buildArcDeTriomphe() {
@@ -94,6 +95,90 @@ function buildArcDeTriomphe() {
   reliefRight.position.set(cx + 14, 38, cz - 18);
   reliefRight.castShadow = true;
   add(reliefRight);
+}
+
+function buildNotreDame() {
+  // World center: cx=36, cz=90 (tiles x=65-68, y=70-72, 4×3 block)
+  // Facade faces south (toward Seine, toward higher z)
+  const cx = 36;
+  const cz = 90;
+
+  const stoneMat = new THREE.MeshToonMaterial({ color: 0xb8a88a });
+  const roofMat  = new THREE.MeshToonMaterial({ color: 0x887060 });
+
+  // 1. Main nave (long body)
+  const nave = new THREE.Mesh(
+    new THREE.BoxGeometry(40, 20, 28),
+    stoneMat
+  );
+  nave.position.set(cx, 10, cz);
+  nave.castShadow = true;
+  nave.receiveShadow = true;
+  add(nave);
+
+  // 2. Two front towers (south facade, toward higher z)
+  const leftTower = new THREE.Mesh(
+    new THREE.BoxGeometry(9, 34, 9),
+    stoneMat
+  );
+  leftTower.position.set(cx - 14, 17, cz + 11);
+  leftTower.castShadow = true;
+  add(leftTower);
+
+  const rightTower = new THREE.Mesh(
+    new THREE.BoxGeometry(9, 34, 9),
+    stoneMat
+  );
+  rightTower.position.set(cx + 14, 17, cz + 11);
+  rightTower.castShadow = true;
+  add(rightTower);
+
+  // 3. Tower caps (square pyramid tops)
+  const leftCap = new THREE.Mesh(
+    new THREE.ConeGeometry(5.5, 10, 4),
+    roofMat
+  );
+  leftCap.rotation.y = Math.PI / 4;
+  leftCap.position.set(cx - 14, 39, cz + 11);
+  leftCap.castShadow = true;
+  add(leftCap);
+
+  const rightCap = new THREE.Mesh(
+    new THREE.ConeGeometry(5.5, 10, 4),
+    roofMat
+  );
+  rightCap.rotation.y = Math.PI / 4;
+  rightCap.position.set(cx + 14, 39, cz + 11);
+  rightCap.castShadow = true;
+  add(rightCap);
+
+  // 4. Central spire (behind towers)
+  const spire = new THREE.Mesh(
+    new THREE.ConeGeometry(3.5, 22, 4),
+    roofMat
+  );
+  spire.rotation.y = Math.PI / 4;
+  spire.position.set(cx, 31, cz - 4);
+  spire.castShadow = true;
+  add(spire);
+
+  // 5. Flying buttress hints (2 pairs of simple thin boxes on sides)
+  const buttressMat = new THREE.MeshToonMaterial({ color: 0xb8a88a });
+  const buttressPositions = [
+    { x: cx - 21, z: cz - 6 },
+    { x: cx - 21, z: cz + 6 },
+    { x: cx + 21, z: cz - 6 },
+    { x: cx + 21, z: cz + 6 },
+  ];
+  for (const { x, z } of buttressPositions) {
+    const buttress = new THREE.Mesh(
+      new THREE.BoxGeometry(3, 8, 6),
+      buttressMat
+    );
+    buttress.position.set(x, 14, z);
+    buttress.castShadow = true;
+    add(buttress);
+  }
 }
 
 function buildEiffelTower() {
