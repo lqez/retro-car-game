@@ -30,6 +30,7 @@ export function buildLandmarks() {
   buildNotreDame();
   buildSacreCœur();
   buildLouvre();
+  buildOperaGarnier();
 }
 
 function buildArcDeTriomphe() {
@@ -371,6 +372,104 @@ function buildLouvre() {
   pyramidWire.position.set(cx, 8, cz + 3);
   pyramidWire.scale.setScalar(1.01);
   add(pyramidWire);
+}
+
+function buildOperaGarnier() {
+  // World center: cx=96, cz=-468 (tiles x=70-73, y=23-26, 4×4 block)
+  const cx = 96;
+  const cz = -468;
+  const PI = Math.PI;
+
+  const facadeMat  = new THREE.MeshToonMaterial({ color: 0xe8d8b0 });
+  const colMat     = new THREE.MeshToonMaterial({ color: 0xd8c898 });
+  const domeMat    = new THREE.MeshToonMaterial({ color: 0x4a7a5f });
+  const goldMat    = new THREE.MeshToonMaterial({ color: 0xd4a820 });
+
+  // 1. Main body
+  const mainBody = new THREE.Mesh(
+    new THREE.BoxGeometry(42, 18, 38),
+    facadeMat
+  );
+  mainBody.position.set(cx, 9, cz);
+  mainBody.castShadow = true;
+  mainBody.receiveShadow = true;
+  add(mainBody);
+
+  // 2. Upper attic story
+  const attic = new THREE.Mesh(
+    new THREE.BoxGeometry(38, 6, 34),
+    facadeMat
+  );
+  attic.position.set(cx, 21, cz);
+  attic.castShadow = true;
+  add(attic);
+
+  // 3. Front colonnade hint (south-facing facade — lower z)
+  const pillarPositions = [cx - 12, cx, cx + 12];
+  for (const px of pillarPositions) {
+    const pillar = new THREE.Mesh(
+      new THREE.BoxGeometry(3, 16, 2),
+      colMat
+    );
+    pillar.position.set(px, 8, cz - 20);
+    pillar.castShadow = true;
+    add(pillar);
+  }
+
+  // 4. Grand central dome
+  // Drum base
+  const drumBase = new THREE.Mesh(
+    new THREE.CylinderGeometry(10, 12, 8, 16),
+    facadeMat
+  );
+  drumBase.position.set(cx, 28, cz);
+  drumBase.castShadow = true;
+  add(drumBase);
+
+  // Dome
+  const dome = new THREE.Mesh(
+    new THREE.SphereGeometry(10, 16, 10, 0, PI * 2, 0, PI * 0.55),
+    domeMat
+  );
+  dome.position.set(cx, 35, cz);
+  dome.castShadow = true;
+  add(dome);
+
+  // Dome finial
+  const finial = new THREE.Mesh(
+    new THREE.CylinderGeometry(0, 1.5, 6, 8),
+    goldMat
+  );
+  finial.position.set(cx, 46, cz);
+  finial.castShadow = true;
+  add(finial);
+
+  // 5. Two smaller flanking domes
+  const flankOffsets = [-16, 16];
+  for (const dx of flankOffsets) {
+    const flankDome = new THREE.Mesh(
+      new THREE.SphereGeometry(5, 12, 8, 0, PI * 2, 0, PI * 0.55),
+      domeMat
+    );
+    flankDome.position.set(cx + dx, 25, cz);
+    flankDome.castShadow = true;
+    add(flankDome);
+  }
+
+  // 6. Roof sculptures hint (small box clusters at roof corners)
+  const cornerOffsets = [
+    { dx: -16, dz: -14 }, { dx: -16, dz: 14 },
+    { dx:  16, dz: -14 }, { dx:  16, dz: 14 },
+  ];
+  for (const { dx, dz } of cornerOffsets) {
+    const sculpture = new THREE.Mesh(
+      new THREE.BoxGeometry(4, 5, 4),
+      goldMat
+    );
+    sculpture.position.set(cx + dx, 25, cz + dz);
+    sculpture.castShadow = true;
+    add(sculpture);
+  }
 }
 
 function buildEiffelTower() {
