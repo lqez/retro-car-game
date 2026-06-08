@@ -70,6 +70,17 @@ export function build() {
   for(let i=0;i<=4;i++){ road(28+i, 48+i); road(29+i, 48+i); } // SW segment
   for(let x=33;x<=44;x++){ road(x,53); }                        // E segment
 
+  // ── EIFFEL TOWER — passable footprint (drive under the arches) ─────────────
+  // 8×8 zone (x=8-15, y=52-59), centre at the tile vertex (12,56) → world
+  // (cx=-336, cz=192). The four corner legs (2×2 blocks) stay impassable; the
+  // rest of the zone becomes a wide crossroads so cars pass beneath the tower,
+  // just like before. The interior connects to the x=10 cross-street, the
+  // y=58-59 boulevard and the x=16-17 avenue, so it survives orphan pruning.
+  for(let y=52;y<=59;y++) for(let x=8;x<=15;x++){
+    const corner=(x<=9||x>=14)&&(y<=53||y>=58);
+    if(!corner) road(x,y);
+  }
+
   // Convert road-over-water to bridge
   for(let i=0;i<MAP_W*MAP_H;i++)
     if(tileMap[i]===T.ROAD&&waterMrk[i]) tileMap[i]=T.BRIDGE;
@@ -118,9 +129,11 @@ export function build() {
     }
   }
 
-  // Eiffel Tower — full 6×6 block, fits cleanly between avenues x=[6,7] and x=[16,17]
-  // and between boulevards y=[50,51] and y=[58,59]  (cx=-348, cz=180)
-  lmk(8,52,6,6);
+  // Eiffel Tower — four corner legs only (2×2 each); interior is the crossroads
+  // carved above. Bottom legs overlap the y=58-59 boulevard and are left as road
+  // by lmk(), so the boulevard stays open and cars drive between the legs.
+  // (cx=-336, cz=192)
+  lmk(8,52,2,2); lmk(14,52,2,2); lmk(8,58,2,2); lmk(14,58,2,2);
 
   lmk(37,29,4,4);                                        // Arc de Triomphe  (cx=-12,  cz=-108)
   lmk(42,43,4,3);                                        // Notre-Dame        (cx=48,   cz=54)
