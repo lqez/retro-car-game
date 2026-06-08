@@ -3,15 +3,45 @@ import { MAP_W, MAP_H, HALF_W, HALF_H,
          tileMap, waterMrk, bldgH, bldgStyle, bldgW, bldgD, parkShade,
          initMap, rngSeed, rng, mi, hash2, fillRect, pruneOrphanRoads } from '../map.js';
 
-export const mapW = 64, mapH = 64;
+const MIN_MAP_SIZE = 40;
+const MAX_MAP_SIZE = 96;
+const MAP_SIZE_STEP = 2;
+const THEMES = ['day', 'night'];
+
+export let mapW = 64, mapH = 64;
 export const hasLandmarks = false;
+export let theme = 'day';
+export let gameplay = Object.freeze({
+  enemyCount: 6,
+  diamondCount: 6,
+  timeLimit: 75,
+});
+
+function randomMapSize() {
+  const steps = ((MAX_MAP_SIZE - MIN_MAP_SIZE) / MAP_SIZE_STEP) + 1;
+  return MIN_MAP_SIZE + Math.floor(Math.random() * steps) * MAP_SIZE_STEP;
+}
+
+function gameplayForSize(size) {
+  const t = (size - MIN_MAP_SIZE) / (MAX_MAP_SIZE - MIN_MAP_SIZE);
+  return Object.freeze({
+    enemyCount: Math.round(4 + t * 8),
+    diamondCount: Math.round(5 + t * 9),
+    timeLimit: Math.round(60 + t * 70),
+  });
+}
 
 export function build() {
+  mapW = randomMapSize();
+  mapH = mapW;
+  theme = THEMES[Math.floor(Math.random() * THEMES.length)];
+  gameplay = gameplayForSize(mapW);
+
   initMap(mapW, mapH);
   rngSeed((Date.now() ^ (Math.random() * 0xffffffff)) >>> 0);
 
-  const RW = 60, RH = 60;
-  const OX = (MAP_W-RW) >> 1, OY = (MAP_H-RH) >> 1;  // = 2, 2
+  const RW = MAP_W - 4, RH = MAP_H - 4;
+  const OX = (MAP_W-RW) >> 1, OY = (MAP_H-RH) >> 1;
 
   // Water channels
   for(let i=0;i<5;i++){

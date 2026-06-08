@@ -1,11 +1,11 @@
 import * as THREE from 'three';
 import { scene } from './scene.js';
-import { TILE, CONST_SPEED, ENEMY_COUNT, ENEMY_SPEED,
+import { TILE, CONST_SPEED, ENEMY_SPEED,
          ENEMY_TERRITORY_R as TERRITORY_R, ENEMY_DETECT_DIST as DETECT_DIST,
          ENEMY_THINK_INTERVAL as THINK_INTERVAL, ENEMY_COLLIDE_DIST as COLLIDE_DIST,
          ENEMY_SPAWN_CLEAR as SPAWN_CLEAR, ENEMY_STUN_TIME as STUN_TIME,
          ENEMY_SPIN_SPEED as SPIN_SPEED, ENEMY_ROT_SPEED } from './constants.js';
-import { HALF_W, HALF_H, roadTiles, tileCenter } from './map.js';
+import { DEFAULT_GAMEPLAY, HALF_W, HALF_H, roadTiles, tileCenter } from './map.js';
 import { clearForDir, moveWithCollision, leadingClearForDir } from './physics.js';
 import { gasStunsAt } from './gas.js';
 
@@ -98,7 +98,7 @@ export function clearEnemies() {
   enemies = [];
 }
 
-export function placeEnemies(spawnTx = HALF_W, spawnTy = HALF_H) {
+export function placeEnemies(count = DEFAULT_GAMEPLAY.enemyCount, spawnTx = HALF_W, spawnTy = HALF_H) {
   clearEnemies();
 
   const cand = roadTiles
@@ -115,7 +115,7 @@ export function placeEnemies(spawnTx = HALF_W, spawnTy = HALF_H) {
     [cand[i], cand[j]] = [cand[j], cand[i]];
   }
 
-  const n = Math.min(ENEMY_COUNT, cand.length);
+  const n = Math.min(count, cand.length);
   for (let i = 0; i < n; i++) {
     const { tx, ty, x, z, dirs } = cand[i];
     const group = buildEnemyCar();

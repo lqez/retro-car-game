@@ -30,10 +30,12 @@ import {
   tileMap, mi, tileAt, tileCenter, tileCenterX, tileCenterZ,
   passable,
   bldgH, bldgW, bldgD, bldgStyle, parkShade, waterMrk, roadTiles,
+  DEFAULT_GAMEPLAY, gameplayFor,
 } from './src/map.js';
 
 import * as randomMap from './src/maps/00_random.js';
 import * as parisMap  from './src/maps/01_paris.js';
+import * as parisNightMap from './src/maps/02_paris_night.js';
 
 import {
   dirX, dirZ, prevDirX, prevDirZ, turnBias, stuckTimer,
@@ -65,16 +67,41 @@ test('CONST_SPEED is positive', () => assert.ok(CONST_SPEED > 0));
 // ─── 2. map module metadata ───────────────────────────────────────────────────
 suite('map module metadata');
 
-test('randomMap is 64×64 with no landmarks', () => {
-  assert.equal(randomMap.mapW, 64);
-  assert.equal(randomMap.mapH, 64);
+test('randomMap has runtime-randomized metadata', () => {
+  randomMap.build();
+  const gameplay = gameplayFor(randomMap);
+  assert.ok(randomMap.mapW >= 40 && randomMap.mapW <= 96, `mapW=${randomMap.mapW}`);
+  assert.equal(randomMap.mapW % 2, 0, 'mapW should stay even');
+  assert.equal(randomMap.mapH, randomMap.mapW);
   assert.equal(randomMap.hasLandmarks, false);
+  assert.ok(['day', 'night'].includes(randomMap.theme), `theme=${randomMap.theme}`);
+  assert.ok(gameplay.enemyCount >= 4 && gameplay.enemyCount <= 12, `enemyCount=${gameplay.enemyCount}`);
+  assert.ok(gameplay.diamondCount >= 5 && gameplay.diamondCount <= 14, `diamondCount=${gameplay.diamondCount}`);
+  assert.ok(gameplay.timeLimit >= 60 && gameplay.timeLimit <= 130, `timeLimit=${gameplay.timeLimit}`);
 });
 
 test('parisMap is 80×80 with landmarks', () => {
   assert.equal(parisMap.mapW, 80);
   assert.equal(parisMap.mapH, 80);
   assert.equal(parisMap.hasLandmarks, true);
+  assert.deepEqual(gameplayFor(parisMap), { enemyCount: 8, diamondCount: 8, timeLimit: 90 });
+});
+
+test('parisNightMap is 80×80 with landmarks and night theme', () => {
+  assert.equal(parisNightMap.mapW, 80);
+  assert.equal(parisNightMap.mapH, 80);
+  assert.equal(parisNightMap.hasLandmarks, true);
+  assert.equal(parisNightMap.theme, 'night');
+  assert.deepEqual(gameplayFor(parisNightMap), { enemyCount: 10, diamondCount: 10, timeLimit: 105 });
+});
+
+test('map gameplay falls back to default values', () => {
+  assert.deepEqual(gameplayFor({}), DEFAULT_GAMEPLAY);
+  assert.deepEqual(gameplayFor({ gameplay: { enemyCount: 1 } }), {
+    enemyCount: 1,
+    diamondCount: DEFAULT_GAMEPLAY.diamondCount,
+    timeLimit: DEFAULT_GAMEPLAY.timeLimit,
+  });
 });
 
 
@@ -84,10 +111,13 @@ suite('map helpers');
 randomMap.build();
 
 test('MAP_W/H updated by build()', () => {
-  assert.equal(MAP_W, 64);
-  assert.equal(MAP_H, 64);
-  assert.equal(HALF_W, 32);
-  assert.equal(HALF_H, 32);
+  assert.ok(MAP_W >= 40 && MAP_W <= 96, `MAP_W=${MAP_W}`);
+  assert.equal(MAP_W % 2, 0, 'MAP_W should stay even');
+  assert.equal(MAP_H, MAP_W);
+  assert.equal(MAP_W, randomMap.mapW);
+  assert.equal(MAP_H, randomMap.mapH);
+  assert.equal(HALF_W, MAP_W >> 1);
+  assert.equal(HALF_H, MAP_H >> 1);
 });
 
 test('mi(x,y) linear mapping', () => {
@@ -166,7 +196,7 @@ test('has sufficient road coverage (≥5%)', () => {
 test('has buildings', () => assert.ok(cR.building > 0));
 
 test('center cross roads are passable', () => {
-  const RW = 60, OX = (MAP_W - RW) / 2;
+  const RW = MAP_W - 4, OX = (MAP_W - RW) / 2;
   for (let tx = OX; tx < OX + RW; tx++) {
     const t = tileMap[mi(tx, HALF_H)];
     assert.ok(t === T.ROAD || t === T.BRIDGE || t === T.WATER,
@@ -302,6 +332,15 @@ test('no orphan roads in paris map', () => {
   for (let i=0;i<MAP_W*MAP_H;i++)
     if ((tileMap[i]===T.ROAD||tileMap[i]===T.BRIDGE) && !seen[i]) orphans++;
   assert.equal(orphans, 0, `${orphans} unreachable road tiles remain`);
+});
+
+test('paris night duplicates paris tile layout', () => {
+  parisMap.build();
+  const parisTiles = tileMap.slice();
+  parisNightMap.build();
+  assert.equal(MAP_W, 80);
+  assert.equal(MAP_H, 80);
+  assert.deepEqual(tileMap, parisTiles);
 });
 
 

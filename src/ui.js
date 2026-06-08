@@ -5,6 +5,7 @@ import { CONST_SPEED, TILE, T } from './constants.js';
 import { MAP_W, MAP_H, HALF_W, HALF_H, tileMap, mi } from './map.js';
 import * as randomMap from './maps/00_random.js';
 import * as parisMap  from './maps/01_paris.js';
+import * as parisNightMap from './maps/02_paris_night.js';
 import { getDiamonds, collectedCount, totalCount, clearDiamonds } from './diamonds.js';
 import { getEnemies, clearEnemies } from './enemies.js';
 import { CHARACTERS, setActiveCharacter } from './characters.js';
@@ -70,8 +71,9 @@ export function initUI(){
     }
     btnStart.disabled = false;
   }
-  document.getElementById('btnParis').addEventListener('click',  () => selectMap('btnParis',  parisMap));
-  document.getElementById('btnRandom').addEventListener('click', () => selectMap('btnRandom', randomMap));
+  document.getElementById('btnParis').addEventListener('click',      () => selectMap('btnParis',      parisMap));
+  document.getElementById('btnParisNight').addEventListener('click', () => selectMap('btnParisNight', parisNightMap));
+  document.getElementById('btnRandom').addEventListener('click',     () => selectMap('btnRandom',     randomMap));
 
   recalBtn.addEventListener('click', calibrate);
 

@@ -68,7 +68,7 @@ const pebbleMeshes = Array.from({length:PCOUNT},()=>{
 });
 const smokeMeshes = Array.from({length:SCOUNT},()=>{
   const m=new THREE.Mesh(smokeGeo,
-    new THREE.MeshBasicMaterial({color:0xddddcc,transparent:true,opacity:0}));
+    new THREE.MeshBasicMaterial({color:0xddddcc,transparent:true,opacity:0,depthWrite:false}));
   m.visible=false; scene.add(m); return m;
 });
 
@@ -106,7 +106,7 @@ export function spawnEffects(x,z,fwX,fwZ,spd){
     s.vx=(Math.random()-0.5)*4.0; s.vy=0.2+Math.random()*0.5; s.vz=(Math.random()-0.5)*4.0;
     s.life=1.0; s.maxLife=1.8+Math.random()*1.2;
     sm.position.set(x+(Math.random()-0.5)*1.5,1.2,z+(Math.random()-0.5)*1.5);
-    sm.scale.setScalar(0.9); sm.material.opacity=0.35; sm.visible=true;
+    sm.scale.setScalar(0.9); sm.material.opacity=0.18; sm.visible=true;
   }
 }
 
@@ -130,7 +130,7 @@ export function updateParticles(dt){
     const m=smokeMeshes[i];
     m.position.x+=s.vx*dt; m.position.y+=s.vy*dt; m.position.z+=s.vz*dt;
     m.scale.setScalar(1+(1-s.life)*6);
-    m.material.opacity=s.life*0.35;
+    m.material.opacity=s.life*0.18;
   }
 }
 
@@ -218,6 +218,6 @@ function crashDust(x, z){
     s.vx=Math.cos(a)*sp; s.vy=0.6+Math.random()*1.2; s.vz=Math.sin(a)*sp;
     s.life=1.0; s.maxLife=1.6+Math.random()*1.0;
     sm.position.set(x+(Math.random()-0.5)*2.0, 1.0, z+(Math.random()-0.5)*2.0);
-    sm.scale.setScalar(1.0); sm.material.opacity=0.4; sm.visible=true;
+    sm.scale.setScalar(1.0); sm.material.opacity=0.22; sm.visible=true;
   }
 }

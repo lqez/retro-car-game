@@ -1,7 +1,7 @@
 import { scene, renderer, camera, composer,
          setTopCamera, cameraPosLead, targetCameraPosLead,
          cameraLookLead, targetCameraLookLead, ZERO_CAMERA_LEAD,
-         sx, sz } from './scene.js';
+         sx, sz, updateStreetLightFocus } from './scene.js';
 import { carGroup, carVisual, wheelMeshes, wR_, spawnEffects, updateParticles,
          startCrash, updateCrash, isCrashing } from './car.js';
 import { keys, joyActive, joyDX, joyDY, joyVisible,
@@ -14,7 +14,7 @@ import { dirX, dirZ, prevDirX, prevDirZ, turnBias, stuckTimer,
 import { GameState, gameState, updateState, winRound, loseRound, won, GAME_DURATION, timeLeft } from './state.js';
 import { gameOn, updateHUD, updateMinimap, showGameOver, initUI, startGame } from './ui.js';
 import { updateDiamonds, collectedCount, totalCount } from './diamonds.js';
-import { updateEnemies } from './enemies.js';
+import { updateEnemies, getEnemies } from './enemies.js';
 import { HALF_W, HALF_H, tileMap, mi } from './map.js';
 import { tileProps } from './tiles.js';
 import { CONST_SPEED, TILE, ROT_SPEED,
@@ -263,6 +263,10 @@ function tick(){
 
     // ── enemies: always update so they keep driving after game-over ──────────────────
     const enemyHit = updateEnemies(dt, carGroup.position.x, carGroup.position.z, _gState===GameState.PLAYING);
+    updateStreetLightFocus([
+      {x:carGroup.position.x,z:carGroup.position.z},
+      ...getEnemies().map(e=>({x:e.x,z:e.z})),
+    ]);
 
     // ── win / lose (PLAYING only) ─────────────────────────────────────────────────────
     if(_gState===GameState.PLAYING){
@@ -286,6 +290,7 @@ function tick(){
     if(gameState!==GameState.GAME_OVER) wasGameOver = false;
 
   }else if(!_gameOn){
+    updateStreetLightFocus();
     cameraPosLead.lerp(ZERO_CAMERA_LEAD, 1-Math.exp(-CAMERA_POS_LEAD_LERP*dt));
     cameraLookLead.lerp(ZERO_CAMERA_LEAD, 1-Math.exp(-CAMERA_LOOK_LEAD_LERP*dt));
     setTopCamera(sx, sz);

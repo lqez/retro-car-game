@@ -5,6 +5,11 @@ import { MAP_W, MAP_H, HALF_W, HALF_H,
 
 export const mapW = 80, mapH = 80;
 export const hasLandmarks = true;
+export const gameplay = Object.freeze({
+  enemyCount: 8,
+  diamondCount: 8,
+  timeLimit: 90,
+});
 
 export function build() {
   initMap(mapW, mapH);

@@ -4,26 +4,30 @@ import { resetPhysics } from './physics.js';
 import { placeDiamonds } from './diamonds.js';
 import { placeEnemies } from './enemies.js';
 import { resetGas } from './gas.js';
+import { DEFAULT_GAMEPLAY, gameplayFor } from './map.js';
 
 export const GameState = Object.freeze({
   MENU:'menu', PLAYING:'playing', GAME_OVER:'game_over'
 });
 
 export let gameState = GameState.MENU;
-export const GAME_DURATION = 90;
+export const GAME_DURATION = DEFAULT_GAMEPLAY.timeLimit;
+export let roundDuration = GAME_DURATION;
 export let timeLeft = GAME_DURATION;
 export let won = false;
 export let lossReason = 'timeout';  // 'timeout' | 'enemy' | 'win'
 
 export function startRound(mapModule){
   buildScene(mapModule);
+  const gameplay = gameplayFor(mapModule);
   resetPhysics();
   resetCrash();
   carGroup.position.set(sx, 0, sz);
-  placeDiamonds();
-  placeEnemies();
+  placeDiamonds(gameplay.diamondCount);
+  placeEnemies(gameplay.enemyCount);
   resetGas();
-  timeLeft = GAME_DURATION;
+  roundDuration = gameplay.timeLimit;
+  timeLeft = roundDuration;
   won = false;
   lossReason = 'timeout';
   gameState = GameState.PLAYING;

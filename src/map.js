@@ -1,5 +1,32 @@
-import { TILE, T } from './constants.js';
+import { TILE, T, ENEMY_COUNT } from './constants.js';
 import { tileProps } from './tiles.js';
+
+export const DEFAULT_GAMEPLAY = Object.freeze({
+  enemyCount: ENEMY_COUNT,
+  diamondCount: 8,
+  timeLimit: 90,
+});
+
+function finiteNumber(value, fallback) {
+  return Number.isFinite(value) ? value : fallback;
+}
+
+function gameplayCount(value, fallback) {
+  return Math.max(0, Math.floor(finiteNumber(value, fallback)));
+}
+
+function gameplayTime(value, fallback) {
+  return Math.max(1, finiteNumber(value, fallback));
+}
+
+export function gameplayFor(mapModule = {}) {
+  const cfg = mapModule.gameplay || {};
+  return {
+    enemyCount: gameplayCount(cfg.enemyCount, DEFAULT_GAMEPLAY.enemyCount),
+    diamondCount: gameplayCount(cfg.diamondCount, DEFAULT_GAMEPLAY.diamondCount),
+    timeLimit: gameplayTime(cfg.timeLimit, DEFAULT_GAMEPLAY.timeLimit),
+  };
+}
 
 // ── live map dimensions — updated by initMap() ───────────────────────────────
 export let MAP_W = 80, MAP_H = 80;

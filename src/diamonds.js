@@ -1,11 +1,10 @@
 import * as THREE from 'three';
 import { scene } from './scene.js';
 import { TILE } from './constants.js';
-import { HALF_W, HALF_H, roadTiles, tileCenter } from './map.js';
+import { DEFAULT_GAMEPLAY, HALF_W, HALF_H, roadTiles, tileCenter } from './map.js';
 import { clearForDir, leadingClearForDir } from './physics.js';
 
 // ─── tunables ───────────────────────────────────────────────────────────────────────────────
-const DIAMOND_COUNT = 8;
 const COLLECT_DIST  = TILE * 0.58;   // diamond radius TILE*0.30 + car half ~TILE*0.28
 const FLOAT_Y       = TILE * 0.55;
 const SPAWN_CLEAR   = 6;              // min Manhattan tile distance from car spawn
@@ -40,7 +39,7 @@ export function clearDiamonds(){
   totalCount = 0;
 }
 
-export function placeDiamonds(spawnTx = HALF_W, spawnTy = HALF_H){
+export function placeDiamonds(count = DEFAULT_GAMEPLAY.diamondCount, spawnTx = HALF_W, spawnTy = HALF_H){
   clearDiamonds();
 
   // candidate road tiles, a comfortable distance from the spawn
@@ -55,7 +54,7 @@ export function placeDiamonds(spawnTx = HALF_W, spawnTy = HALF_H){
     [cand[i],cand[j]]=[cand[j],cand[i]];
   }
 
-  const n = Math.min(DIAMOND_COUNT, cand.length);
+  const n = Math.min(count, cand.length);
   for(let i=0;i<n;i++){
     const {tx,ty} = cand[i];
     const {x,z}   = tileCenter(tx,ty);
