@@ -180,7 +180,7 @@ function tick(){
     updateParticles(dt);
 
     // ── camera tilt: follow lean direction, much more subtle ─────────────────────────
-    camTilt += (leanAngle * (MAX_CAM_TILT / MAX_LEAN) - camTilt) * Math.min(1, CAM_TILT_LERP * dt);
+    camTilt += (-leanAngle * (MAX_CAM_TILT / MAX_LEAN) - camTilt) * Math.min(1, CAM_TILT_LERP * dt);
 
     // ── camera lead (original 32-unit offset) ────────────────────────────────────────
     targetCameraLead.set(-dirX*32, 0, -dirZ*32);
