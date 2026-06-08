@@ -1,7 +1,7 @@
 import { scene, renderer, camera, composer,
          setTopCamera, cameraLead, targetCameraLead, ZERO_CAMERA_LEAD,
          sx, sz } from './scene.js';
-import { carGroup, wheelMeshes, wR_, spawnEffects, updateParticles } from './car.js';
+import { carGroup, carVisual, wheelMeshes, wR_, spawnEffects, updateParticles } from './car.js';
 import { keys, joyActive, joyDX, joyDY, joyVisible,
          rawBeta, rawGamma, baseBeta, baseGamma,
          calibrate, sensorOk } from './input.js';
@@ -12,31 +12,50 @@ import { GameState, gameState, updateState, winRound, loseRound, won, GAME_DURAT
 import { gameOn, updateHUD, updateMinimap, showGameOver, initUI, startGame } from './ui.js';
 import { updateDiamonds, collectedCount, totalCount } from './diamonds.js';
 import { updateEnemies } from './enemies.js';
-import { CONST_SPEED } from './constants.js';
+import { tileMap, mi } from './map.js';
+import { CONST_SPEED, TILE, HALF_W, HALF_H, T } from './constants.js';
 
 // ─── init ─────────────────────────────────────────────────────────────────────────────
 initUI();
 
 // ─── game loop state ─────────────────────────────────────────────────────────────────
-let particleTimer=0;
-let wheelAngle=0;
-let last=performance.now();
-let wasGameOver=false;
+let particleTimer = 0;
+let wheelAngle    = 0;
+let last          = performance.now();
+let wasGameOver   = false;
+
+// ── driving feel ─────────────────────────────────────────────────────────────────────
+const MAX_LEAN  = 0.32;   // radians (~18°), exaggerated so it's visible top-down
+const LEAN_HOLD = 0.45;   // seconds to sustain lean after a turn
+const LEAN_LERP = 7;      // lerp speed (higher = snappier)
+
+let bumpT     = 0;
+let leanAngle = 0;
+let leanTarget = 0;
+let leanTimer  = 0;
+let snapDirX   = 0, snapDirZ = -1;  // last committed direction, for turn detection
 
 // ─── tick ───────────────────────────────────────────────────────────────────────────────
 function tick(){
   requestAnimationFrame(tick);
-  const now=performance.now();
-  const dt=Math.min((now-last)/1000,0.05);
-  last=now;
+  const now = performance.now();
+  const dt  = Math.min((now - last) / 1000, 0.05);
+  last = now;
 
-  // Read current module-level values each frame (live bindings)
   const _gameOn   = gameOn;
   const _sensorOk = sensorOk;
   const _gState   = gameState;
 
   if(_gameOn && _sensorOk){
-    // ── player steers: key/tilt = desired direction (playing only) ─────────────────────────────
+
+    // ── terrain detection ─────────────────────────────────────────────────────────────
+    const ctX      = Math.round(carGroup.position.x / TILE + HALF_W);
+    const ctZ      = Math.round(carGroup.position.z / TILE + HALF_H);
+    const onBridge = tileMap[mi(ctX, ctZ)] === T.BRIDGE;
+    const speedMult = onBridge ? 0.8 : 1.0;
+    const eDt       = dt * speedMult;   // terrain-adjusted frame step for movement
+
+    // ── player steers (PLAYING only) ─────────────────────────────────────────────────
     if(_gState===GameState.PLAYING){
       let wantX=0, wantZ=0;
       if     (keys['ArrowUp']   ||keys['KeyW']) { wantX=0;  wantZ=-1; }
@@ -44,7 +63,6 @@ function tick(){
       else if(keys['ArrowRight']||keys['KeyD']) { wantX=1;  wantZ=0;  }
       else if(keys['ArrowLeft'] ||keys['KeyA']) { wantX=-1; wantZ=0;  }
 
-      // Virtual joystick: dominant drag axis (only when no key pressed)
       if(wantX===0&&wantZ===0 && joyActive){
         const ax=Math.abs(joyDX), ay=Math.abs(joyDY);
         if(Math.max(ax,ay) > 14){
@@ -53,7 +71,6 @@ function tick(){
         }
       }
 
-      // Sensor: dominant tilt axis — only when no key/joystick and recalibrate button active
       if(wantX===0&&wantZ===0 && !joyVisible){
         const tiltFwd  = rawBeta  - baseBeta;
         const tiltSide = rawGamma - baseGamma;
@@ -65,7 +82,6 @@ function tick(){
         }
       }
 
-      // Apply player steer when the new direction's leading edge is clear
       if((wantX!==0||wantZ!==0)&&(wantX!==dirX||wantZ!==dirZ)){
         const wnx=carGroup.position.x+wantX*CONST_SPEED*dt;
         const wnz=carGroup.position.z+wantZ*CONST_SPEED*dt;
@@ -77,8 +93,8 @@ function tick(){
       }
     }
 
-    // ── always move; auto-turn on wall hit ────────────────────────────────────────────
-    const move=moveWithCollision(carGroup.position.x,carGroup.position.z,dirX,dirZ,dt);
+    // ── move with terrain speed; auto-turn on wall hit ────────────────────────────────
+    const move=moveWithCollision(carGroup.position.x,carGroup.position.z,dirX,dirZ,eDt);
 
     if(move.moved){
       carGroup.position.x=move.x;
@@ -107,7 +123,7 @@ function tick(){
         const tnx=carGroup.position.x+tx*CONST_SPEED*dt;
         const tnz=carGroup.position.z+tz*CONST_SPEED*dt;
         if(leadingClearForDir(tnx,tnz,tx,tz)){
-          const turnMove=moveWithCollision(carGroup.position.x,carGroup.position.z,tx,tz,dt);
+          const turnMove=moveWithCollision(carGroup.position.x,carGroup.position.z,tx,tz,eDt);
           if(!turnMove.moved)continue;
           setPrevDir(dirX,dirZ);
           setDir(tx,tz);
@@ -120,66 +136,81 @@ function tick(){
       }
     }
 
-    // ── visual rotation toward current direction ──────────────────────────────────────────
+    // ── detect turn for lean (check after any direction change) ─────────────────────
+    if(dirX !== snapDirX || dirZ !== snapDirZ){
+      const cross = snapDirX * dirZ - snapDirZ * dirX;
+      if(cross !== 0){ leanTarget = -cross * MAX_LEAN; leanTimer = LEAN_HOLD; }
+      snapDirX = dirX; snapDirZ = dirZ;
+    }
+
+    // ── visual rotation toward current direction ───────────────────────────────────────
     setTargetRotY(Math.atan2(-dirZ, dirX));
     let diff=targetRotY-carGroup.rotation.y;
     while(diff>Math.PI)  diff-=Math.PI*2;
     while(diff<-Math.PI) diff+=Math.PI*2;
     carGroup.rotation.y+=Math.sign(diff)*Math.min(Math.abs(diff), ROT_SPEED*dt);
 
-    // ── wheel spin ────────────────────────────────────────────────────────────────────
-    wheelAngle-=CONST_SPEED*dt/wR_;
-    wheelMeshes.forEach(w=>w.rotation.y=wheelAngle);
+    // ── bump: rough road / stronger on bridge ─────────────────────────────────────────
+    bumpT += CONST_SPEED * speedMult * dt;
+    const bumpAmp = onBridge ? TILE * 0.055 : TILE * 0.018;
+    const bump = Math.sin(bumpT * 0.042) * 0.50
+               + Math.sin(bumpT * 0.110) * 0.35
+               + Math.sin(bumpT * 0.270) * 0.15;
+    carVisual.position.y = bump * bumpAmp;
 
-    // ── particles ──────────────────────────────────────────────────────────────────────
-    particleTimer+=dt;
-    if(particleTimer>0.055){
-      particleTimer=0;
-      spawnEffects(carGroup.position.x,carGroup.position.z,dirX,dirZ,CONST_SPEED);
+    // ── lean: bank into turns ─────────────────────────────────────────────────────────
+    leanTimer = Math.max(0, leanTimer - dt);
+    const targetLean = leanTimer > 0 ? leanTarget : 0;
+    leanAngle += (targetLean - leanAngle) * Math.min(1, LEAN_LERP * dt);
+    carVisual.rotation.x = leanAngle;
+
+    // ── wheel spin (no-op with GLB, but kept for particle compat) ─────────────────────
+    wheelAngle -= CONST_SPEED * speedMult * dt / wR_;
+    wheelMeshes.forEach(w => w.rotation.y = wheelAngle);
+
+    // ── particles ────────────────────────────────────────────────────────────────────
+    particleTimer += dt;
+    if(particleTimer > 0.055){
+      particleTimer = 0;
+      spawnEffects(carGroup.position.x, carGroup.position.z, dirX, dirZ, CONST_SPEED * speedMult);
     }
     updateParticles(dt);
 
-    // ── camera ───────────────────────────────────────────────────────────────────────
-    const tgtX=carGroup.position.x;
-    const tgtZ=carGroup.position.z;
-    targetCameraLead.set(-dirX*32,0,-dirZ*32);
+    // ── camera: 2× stronger lead ──────────────────────────────────────────────────────
+    targetCameraLead.set(-dirX*64, 0, -dirZ*64);
     cameraLead.lerp(targetCameraLead, 1-Math.exp(-2.4*dt));
-    setTopCamera(tgtX,tgtZ);
+    setTopCamera(carGroup.position.x, carGroup.position.z);
 
-    // ── diamonds: always update so pop animation plays through game-over ──────────────
+    // ── diamonds: always update so pop animation finishes through game-over ──────────
     updateDiamonds(dt, carGroup.position.x, carGroup.position.z);
 
-    // ── enemies: always update so they keep driving after game-over ───────────────────
+    // ── enemies: always update so they keep driving after game-over ──────────────────
     const enemyHit = updateEnemies(dt, carGroup.position.x, carGroup.position.z);
 
-    // ── win / lose checks (PLAYING only) ─────────────────────────────────────────────
+    // ── win / lose (PLAYING only) ─────────────────────────────────────────────────────
     if(_gState===GameState.PLAYING){
       if(totalCount>0 && collectedCount>=totalCount) winRound();
       if(enemyHit) loseRound();
     }
 
-    // ── update game state (timer) + HUD (PLAYING only) ───────────────────────────────
+    // ── timer + HUD (PLAYING only) ────────────────────────────────────────────────────
     if(_gState===GameState.PLAYING){
       updateState(dt);
-
-      const _dirX=dirX, _dirZ=dirZ;
-      const dirArrow=_dirX>0?'→':_dirX<0?'←':_dirZ<0?'↑':'↓';
+      const dirArrow = dirX>0?'→':dirX<0?'←':dirZ<0?'↑':'↓';
       updateHUD(dirArrow);
       updateMinimap(carGroup.position.x, carGroup.position.z);
     }
 
-    // ── check game over ───────────────────────────────────────────────────────────────
+    // ── game over check ───────────────────────────────────────────────────────────────
     if(gameState===GameState.GAME_OVER && !wasGameOver){
-      wasGameOver=true;
+      wasGameOver = true;
       showGameOver(won, collectedCount, totalCount);
     }
-    if(gameState!==GameState.GAME_OVER){
-      wasGameOver=false;
-    }
+    if(gameState!==GameState.GAME_OVER) wasGameOver = false;
 
   }else if(!_gameOn){
     cameraLead.lerp(ZERO_CAMERA_LEAD, 1-Math.exp(-2.4*dt));
-    setTopCamera(sx,sz);
+    setTopCamera(sx, sz);
   }
 
   composer.render();
