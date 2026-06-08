@@ -27,6 +27,10 @@
   #returnBtn:active{transform:translate(-50%,-50%) scale(.95)}
   #minimap{position:fixed;bottom:16px;left:16px;width:80px;height:80px;border-radius:50%;border:1.5px solid rgba(180,210,255,.28);box-shadow:0 4px 18px rgba(0,0,60,.5),inset 0 1px 3px rgba(255,255,255,.15);z-index:10;display:none;background:rgba(0,0,0,.42);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);}
   #gameOverMsg{position:fixed;top:38%;left:50%;transform:translate(-50%,-50%);padding:14px 30px;border-radius:14px;background:rgba(0,0,0,.62);color:#fff;font-size:clamp(1rem,3.5vw,1.4rem);font-weight:800;text-align:center;z-index:15;display:none;white-space:nowrap;box-shadow:0 4px 24px rgba(0,0,0,.5);}
+  .charBtn{padding:12px 22px;border:2px solid rgba(100,220,255,.45);border-radius:12px;font-size:clamp(.88rem,2.5vw,1rem);font-weight:800;background:rgba(100,220,255,.08);color:#64dcff;cursor:pointer;transition:background .15s,transform .1s;}
+  .charBtn:hover,.charBtn:active{background:rgba(100,220,255,.22);transform:scale(.97);}
+  .charBtn.active{background:rgba(100,220,255,.28);border-color:#64dcff;box-shadow:0 0 14px rgba(100,220,255,.45);}
+  .sectionLabel{color:#888;font-size:clamp(.72rem,2vw,.82rem);letter-spacing:2px;text-transform:uppercase;margin-bottom:10px;}
 </style>
 </head>
 <body>
@@ -34,9 +38,17 @@
 <div id="overlay">
   <h1>CITY CAR</h1>
   <div id="mapSelect">
-    <p style="color:#ccc;font-size:clamp(.8rem,2.5vw,.95rem);margin-bottom:20px;text-align:center;max-width:320px;line-height:1.8;">
-      도시를 선택하세요.<br>
-      <span style="font-size:.8em;color:#888;">기기 기울기·가상 조이스틱·방향키로 주행</span>
+    <!-- Character selection -->
+    <p class="sectionLabel">캐릭터 선택</p>
+    <div id="charSelect" style="display:flex;flex-wrap:wrap;justify-content:center;gap:12px;margin-bottom:28px;">
+      <button class="charBtn" data-char="han">한</button>
+      <button class="charBtn" data-char="poong">풍장군</button>
+      <button class="charBtn" data-char="elvers">엘버스</button>
+    </div>
+    <!-- Map selection -->
+    <p class="sectionLabel">도시 선택</p>
+    <p style="color:#ccc;font-size:clamp(.75rem,2.2vw,.88rem);margin-bottom:18px;text-align:center;max-width:300px;line-height:1.7;">
+      <span style="color:#888;">기기 기울기·조이스틱·방향키로 주행</span>
     </p>
     <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:16px;margin-bottom:0;">
       <button class="mapBtn" id="btnParis">🗼 Paris</button>

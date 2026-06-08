@@ -22,34 +22,44 @@ carGroup.add(blobShadow);
 export const wheelMeshes = [];
 export const wR_ = TILE * 0.24 * 0.70;
 
-// ─── load GLB player car ─────────────────────────────────────────────────────
-new GLTFLoader().load('./assets/car.glb', (gltf) => {
-  const model = gltf.scene;
+// ─── character model loader ──────────────────────────────────────────────────
+const _loader = new GLTFLoader();
+let _loadId = 0; // incremented each load; stale callbacks are ignored
 
-  model.traverse(child => {
-    if (child.isMesh) {
-      child.castShadow    = true;
-      child.receiveShadow = true;
-    }
+export function loadCharacterModel(char) {
+  // Remove any currently loaded model meshes from carVisual
+  while (carVisual.children.length > 0) carVisual.remove(carVisual.children[0]);
+
+  const thisId = ++_loadId;
+  _loader.load(char.glb, (gltf) => {
+    if (thisId !== _loadId) return; // superseded by a newer load
+    const model = gltf.scene;
+
+    model.traverse(child => {
+      if (child.isMesh) {
+        child.castShadow    = true;
+        child.receiveShadow = true;
+      }
+    });
+
+    // Scale so the longest horizontal extent ≈ car length (2 × CAR_HL = TILE * 0.96)
+    // then apply character's scale multiplier.
+    const box1 = new THREE.Box3().setFromObject(model);
+    const size  = box1.getSize(new THREE.Vector3());
+    const base  = (TILE * 0.96) / Math.max(size.x, size.z);
+    model.scale.setScalar(base * (char.scaleMul ?? 1.0));
+
+    // Rotate to face local +X (game forward direction).
+    model.rotation.y = Math.PI;
+
+    // Centre horizontally and sit on ground
+    const box2   = new THREE.Box3().setFromObject(model);
+    const centre = box2.getCenter(new THREE.Vector3());
+    model.position.set(-centre.x, -box2.min.y, -centre.z);
+
+    carVisual.add(model);
   });
-
-  // Scale so the longest horizontal extent ≈ car length (2 × CAR_HL = TILE * 0.96)
-  const box1 = new THREE.Box3().setFromObject(model);
-  const size  = box1.getSize(new THREE.Vector3());
-  const scale = (TILE * 0.96) / Math.max(size.x, size.z);
-  model.scale.setScalar(scale);
-
-  // Rotate to face the car's local +X (game forward direction).
-  // This model faces local +Z by default → rotate 180° so front aligns with +X.
-  model.rotation.y = Math.PI;
-
-  // Centre horizontally and sit on ground after scale + rotation
-  const box2   = new THREE.Box3().setFromObject(model);
-  const centre = box2.getCenter(new THREE.Vector3());
-  model.position.set(-centre.x, -box2.min.y, -centre.z);
-
-  carVisual.add(model);
-});
+}
 
 // ─── particles ────────────────────────────────────────────────────────────────
 const PCOUNT=60, SCOUNT=70;

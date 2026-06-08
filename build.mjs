@@ -37,14 +37,17 @@ await build({
   define: { __APP_VERSION__: JSON.stringify(VERSION) },
 });
 
-// Copy static assets (GLB models, etc.) into public/assets/
-try {
-  const files = await readdir('assets');
-  await Promise.all(files.map(async f => {
-    const s = await stat(`assets/${f}`);
-    if (s.isFile()) await copyFile(`assets/${f}`, `${OUT_DIR}/assets/${f}`);
-  }));
-} catch {}
+// Copy static assets (GLB models, subdirectories included) into public/assets/
+async function copyDir(src, dest) {
+  await mkdir(dest, { recursive: true });
+  const entries = await readdir(src, { withFileTypes: true });
+  await Promise.all(entries.map(e =>
+    e.isDirectory()
+      ? copyDir(`${src}/${e.name}`, `${dest}/${e.name}`)
+      : copyFile(`${src}/${e.name}`, `${dest}/${e.name}`)
+  ));
+}
+try { await copyDir('assets', `${OUT_DIR}/assets`); } catch {}
 
 // Emit public/index.html from the root template, swapping the importmap +
 // module script for a single tag that loads the bundle.
