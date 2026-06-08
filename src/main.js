@@ -8,8 +8,9 @@ import { keys, joyActive, joyDX, joyDY, joyVisible,
 import { dirX, dirZ, prevDirX, prevDirZ, turnBias, stuckTimer,
          leadingClearForDir, moveWithCollision, targetRotY, ROT_SPEED,
          setDir, setPrevDir, setTurnBias, setStuckTimer, setTargetRotY } from './physics.js';
-import { GameState, gameState, updateState, GAME_DURATION, timeLeft } from './state.js';
+import { GameState, gameState, updateState, winRound, won, GAME_DURATION, timeLeft } from './state.js';
 import { gameOn, updateHUD, updateMinimap, showGameOver, initUI, startGame } from './ui.js';
+import { updateDiamonds, collectedCount, totalCount } from './diamonds.js';
 import { CONST_SPEED } from './constants.js';
 
 // ─── init ─────────────────────────────────────────────────────────────────────────────
@@ -144,6 +145,12 @@ function tick(){
     cameraLead.lerp(targetCameraLead, 1-Math.exp(-2.4*dt));
     setTopCamera(tgtX,tgtZ);
 
+    // ── diamonds: collect + win check ────────────────────────────────────────────────
+    if(_gState===GameState.PLAYING){
+      updateDiamonds(dt, carGroup.position.x, carGroup.position.z);
+      if(totalCount>0 && collectedCount>=totalCount) winRound();
+    }
+
     // ── update game state (timer) ──────────────────────────────────────────────────
     if(_gState===GameState.PLAYING){
       updateState(dt);
@@ -158,7 +165,7 @@ function tick(){
     // ── check game over ───────────────────────────────────────────────────────────────
     if(gameState===GameState.GAME_OVER && !wasGameOver){
       wasGameOver=true;
-      showGameOver();
+      showGameOver(won, collectedCount, totalCount);
     }
     if(gameState!==GameState.GAME_OVER){
       wasGameOver=false;

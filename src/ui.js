@@ -2,10 +2,13 @@ import { timeLeft, startRound } from './state.js';
 import { calibrate, reqSensor, initJoystick } from './input.js';
 import { CONST_SPEED, MAP_W, MAP_H, HALF_W, HALF_H, TILE, T } from './constants.js';
 import { tileMap, mi } from './map.js';
+import { getDiamonds, collectedCount, totalCount, clearDiamonds } from './diamonds.js';
+
+const DIAMOND_BLUE = '#2ad4ff';
 
 export let gameOn = false;
 
-let overlay, hud, recalBtn, returnBtn;
+let overlay, hud, recalBtn, returnBtn, gameOverMsg;
 let mapSelectEl;
 let selectedMap = null;
 let starting = false;
@@ -41,6 +44,7 @@ export function initUI(){
   initJoystick(canvasEl, recalBtn, ()=>gameOn);
   returnBtn = document.getElementById('returnBtn');
   returnBtn.addEventListener('click', returnToMenu);
+  gameOverMsg = document.getElementById('gameOverMsg');
 }
 
 export async function startGame(){
@@ -100,15 +104,6 @@ export function updateMinimap(carX, carZ){
   minimapCtx.drawImage(minimapBg, sx, sy, MMAP_VIEW, MMAP_VIEW, 0, 0, MMAP_PX, MMAP_PX);
   minimapCtx.imageSmoothingEnabled = true;
 
-  // Car dot (yellow)
-  minimapCtx.shadowColor = '#ffaa00';
-  minimapCtx.shadowBlur  = 5;
-  minimapCtx.beginPath();
-  minimapCtx.arc(R, R, 2.5, 0, Math.PI*2);
-  minimapCtx.fillStyle = '#ffd400';
-  minimapCtx.fill();
-  minimapCtx.shadowBlur = 0;
-
   // Convex glass: edge vignette
   const vig = minimapCtx.createRadialGradient(R,R,R*0.35, R,R,R);
   vig.addColorStop(0,   'rgba(0,0,0,0)');
@@ -125,25 +120,68 @@ export function updateMinimap(carX, carZ){
   minimapCtx.fillStyle = spec;
   minimapCtx.fillRect(0, 0, MMAP_PX, MMAP_PX);
 
+  // ── diamond markers (drawn on top of the glass so they stay legible) ───────
+  const tilesToPx = MMAP_PX / MMAP_VIEW;
+  const edgeR = R - 4;
+  minimapCtx.fillStyle = DIAMOND_BLUE;
+  for(const d of getDiamonds()){
+    if(d.collected) continue;
+    const dxp = (d.x - carX)/TILE * tilesToPx;
+    const dzp = (d.z - carZ)/TILE * tilesToPx;
+    if(Math.hypot(dxp,dzp) <= edgeR){
+      // in view → small bright-blue box
+      const bx = R + dxp, by = R + dzp;
+      minimapCtx.fillRect(bx-2.5, by-2.5, 5, 5);
+    }else{
+      // out of view → arrow on the rim pointing toward it
+      const ang = Math.atan2(dzp, dxp);
+      minimapCtx.save();
+      minimapCtx.translate(R + Math.cos(ang)*edgeR, R + Math.sin(ang)*edgeR);
+      minimapCtx.rotate(ang);
+      minimapCtx.beginPath();
+      minimapCtx.moveTo(5,0); minimapCtx.lineTo(-3,-3.5); minimapCtx.lineTo(-3,3.5);
+      minimapCtx.closePath();
+      minimapCtx.fill();
+      minimapCtx.restore();
+    }
+  }
+
+  // Car dot (yellow) — always on top, dead centre
+  minimapCtx.shadowColor = '#ffaa00';
+  minimapCtx.shadowBlur  = 5;
+  minimapCtx.beginPath();
+  minimapCtx.arc(R, R, 2.5, 0, Math.PI*2);
+  minimapCtx.fillStyle = '#ffd400';
+  minimapCtx.fill();
+  minimapCtx.shadowBlur = 0;
+
   minimapCtx.restore();
 }
 
 export function updateHUD(dirArrow){
   if(!hud) return;
-  hud.textContent=`${dirArrow} ${(CONST_SPEED*3.6).toFixed(0)} km/h\n⏱ ${Math.ceil(timeLeft)}s`;
+  hud.textContent=`${dirArrow} ${(CONST_SPEED*3.6).toFixed(0)} km/h\n💎 ${collectedCount}/${totalCount}\n⏱ ${Math.ceil(timeLeft)}s`;
 }
 
-export function showGameOver(){
+export function showGameOver(won, collected, total){
   hud.style.display='none';
   recalBtn.style.display='none';
   if(minimapEl) minimapEl.style.display='none';
+  if(gameOverMsg){
+    gameOverMsg.textContent = won
+      ? `🎉 모든 다이아몬드 수집! ${collected}/${total}`
+      : `⏰ 시간 종료  💎 ${collected}/${total}`;
+    gameOverMsg.style.display='block';
+  }
   returnBtn.style.display='block';
 }
 
 function returnToMenu(){
   returnBtn.style.display='none';
+  if(gameOverMsg) gameOverMsg.style.display='none';
   gameOn=false;
   selectedMap=null;
+  clearDiamonds();
   minimapBg=null; minimapCtx=null; minimapEl=null;
   mapSelectEl.style.display='flex';
   overlay.style.display='flex';
