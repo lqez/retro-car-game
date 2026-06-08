@@ -6,6 +6,8 @@ import * as randomMap from './maps/00_random.js';
 import * as parisMap  from './maps/01_paris.js';
 import { getDiamonds, collectedCount, totalCount, clearDiamonds } from './diamonds.js';
 import { getEnemies, clearEnemies } from './enemies.js';
+import { CHARACTERS, setActiveCharacter } from './characters.js';
+import { loadCharacterModel } from './car.js';
 
 const DIAMOND_BLUE = '#2ad4ff';
 const ENEMY_RED    = '#ff4444';
@@ -13,7 +15,7 @@ const ENEMY_RED    = '#ff4444';
 export let gameOn = false;
 
 let overlay, hud, recalBtn, returnBtn, gameOverMsg;
-let mapSelectEl;
+let mapSelectEl, charSelectEl;
 let selectedMap = null;
 let starting = false;
 
@@ -29,9 +31,26 @@ export function initUI(){
   hud        = document.getElementById('hud');
   recalBtn   = document.getElementById('recalBtn');
   mapSelectEl   = document.getElementById('mapSelect');
+  charSelectEl  = document.getElementById('charSelect');
   const verEl = document.getElementById('version');
   if (verEl) verEl.textContent = _ver;
 
+  // ── character selection ───────────────────────────────────────────────────
+  const charBtns = charSelectEl ? charSelectEl.querySelectorAll('.charBtn') : [];
+  // Load the default character model immediately
+  loadCharacterModel(CHARACTERS[0]);
+
+  charBtns.forEach((btn, i) => {
+    if (i === 0) btn.classList.add('active');
+    btn.addEventListener('click', () => {
+      charBtns.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      setActiveCharacter(CHARACTERS[i]);
+      loadCharacterModel(CHARACTERS[i]);
+    });
+  });
+
+  // ── map selection ─────────────────────────────────────────────────────────
   document.getElementById('btnParis').addEventListener('click', () => {
     selectedMap = parisMap;
     startGame();
