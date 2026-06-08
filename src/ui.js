@@ -1,6 +1,7 @@
 import { timeLeft, startRound } from './state.js';
 import { calibrate, reqSensor, initJoystick } from './input.js';
-import { CONST_SPEED } from './constants.js';
+import { CONST_SPEED, MAP_W, MAP_H, HALF_W, HALF_H, TILE, T } from './constants.js';
+import { tileMap, mi } from './map.js';
 
 export let gameOn = false;
 
@@ -8,6 +9,9 @@ let overlay, hud, recalBtn, returnBtn;
 let mapSelectEl;
 let selectedMap = null;
 let starting = false;
+
+const MMAP_COLORS = ['#555566','#9ba7ad','#4a7a56','#3399dd','#997755'];
+let minimapEl, minimapCtx, minimapBg;
 
 export function initUI(){
   overlay    = document.getElementById('overlay');
@@ -43,8 +47,39 @@ export async function startGame(){
   overlay.style.display='none';
   hud.style.display='block';
   recalBtn.style.display='block';
+  initMinimap();
   gameOn=true;
   starting=false;
+}
+
+function initMinimap(){
+  minimapEl = document.getElementById('minimap');
+  if(!minimapEl) return;
+  minimapEl.width = MAP_W;
+  minimapEl.height = MAP_H;
+  minimapCtx = minimapEl.getContext('2d');
+  minimapBg = document.createElement('canvas');
+  minimapBg.width = MAP_W;
+  minimapBg.height = MAP_H;
+  const bgCtx = minimapBg.getContext('2d');
+  for(let ty=0;ty<MAP_H;ty++){
+    for(let tx=0;tx<MAP_W;tx++){
+      bgCtx.fillStyle = MMAP_COLORS[tileMap[mi(tx,ty)]] ?? '#9ba7ad';
+      bgCtx.fillRect(tx,ty,1,1);
+    }
+  }
+  minimapEl.style.display = 'block';
+}
+
+export function updateMinimap(carX, carZ){
+  if(!minimapCtx||!minimapBg) return;
+  minimapCtx.drawImage(minimapBg,0,0);
+  const mx = carX/TILE + HALF_W;
+  const mz = carZ/TILE + HALF_H;
+  minimapCtx.beginPath();
+  minimapCtx.arc(mx,mz,2.5,0,Math.PI*2);
+  minimapCtx.fillStyle = '#ffd400';
+  minimapCtx.fill();
 }
 
 export function updateHUD(dirArrow){
@@ -55,6 +90,7 @@ export function updateHUD(dirArrow){
 export function showGameOver(){
   hud.style.display='none';
   recalBtn.style.display='none';
+  if(minimapEl) minimapEl.style.display='none';
   returnBtn.style.display='block';
 }
 
@@ -62,6 +98,7 @@ function returnToMenu(){
   returnBtn.style.display='none';
   gameOn=false;
   selectedMap=null;
+  minimapBg=null; minimapCtx=null; minimapEl=null;
   mapSelectEl.style.display='flex';
   overlay.style.display='flex';
 }

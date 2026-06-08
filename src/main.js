@@ -9,7 +9,7 @@ import { dirX, dirZ, prevDirX, prevDirZ, turnBias, stuckTimer,
          leadingClearForDir, moveWithCollision, targetRotY, ROT_SPEED,
          setDir, setPrevDir, setTurnBias, setStuckTimer, setTargetRotY } from './physics.js';
 import { GameState, gameState, updateState, GAME_DURATION, timeLeft } from './state.js';
-import { gameOn, updateHUD, showGameOver, initUI, startGame } from './ui.js';
+import { gameOn, updateHUD, updateMinimap, showGameOver, initUI, startGame } from './ui.js';
 import { CONST_SPEED } from './constants.js';
 
 // ─── init ─────────────────────────────────────────────────────────────────────────────
@@ -152,6 +152,7 @@ function tick(){
       const _dirX=dirX, _dirZ=dirZ;
       const dirArrow=_dirX>0?'→':_dirX<0?'←':_dirZ<0?'↑':'↓';
       updateHUD(dirArrow);
+      updateMinimap(carGroup.position.x, carGroup.position.z);
     }
 
     // ── check game over ───────────────────────────────────────────────────────────────

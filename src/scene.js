@@ -375,7 +375,7 @@ export function buildScene(mapType){
     const szMat=new THREE.MeshBasicMaterial({color:0xffffff,opacity:0.85,transparent:true,depthWrite:false,side:THREE.DoubleSide});
     for(const {tx1,ty1,tx2,ty2} of szSel){
       const p1=tileCenter(tx1,ty1),p2=tileCenter(tx2,ty2);
-      const wL=p1.x-TILE*0.5,wR=p2.x+TILE*0.5,wT=p1.z-TILE*0.5,wB=p2.z+TILE*0.5;
+      const wL=p1.x+TILE*0.5,wR=p2.x-TILE*0.5,wT=p1.z+TILE*0.5,wB=p2.z-TILE*0.5;
       const wW=wR-wL,wD=wB-wT,cx=(wL+wR)*0.5,cz=(wT+wB)*0.5;
       const iW=wW-CR*2,iD=wD-CR*2;
       if(iW<=0||iD<=0)continue;
