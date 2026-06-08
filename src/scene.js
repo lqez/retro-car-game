@@ -6,6 +6,7 @@ import { TILE, MAP_W, MAP_H, HALF_W, HALF_H, T } from './constants.js';
 import { resetMap, buildRandom, buildParis,
          tileMap, bldgW, bldgD, bldgH, bldgStyle, parkShade,
          mi, tileCenter, tileCenterX, tileCenterZ } from './map.js';
+import { initLandmarks, clearLandmarks, buildLandmarks } from './landmarks.js';
 
 // ─── renderer ────────────────────────────────────────────────────────────────────────────
 const canvas   = document.getElementById('c');
@@ -17,6 +18,7 @@ renderer.shadowMap.type    = THREE.PCFSoftShadowMap;
 export const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x87ceeb);
 scene.fog = new THREE.Fog(0x87ceeb, 200, 440);
+initLandmarks(scene);
 
 export const camera = new THREE.PerspectiveCamera(42,1,1,700);
 camera.up.set(0,0,-1);
@@ -108,6 +110,7 @@ onResize();
 // ─── buildScene ─────────────────────────────────────────────────────────────────────────────
 export function buildScene(mapType){
   // Remove old meshes before adding new ones
+  clearLandmarks();
   [mRoad,mBridge,mPark,mWater,...mBldgs].forEach(m=>{ if(m) scene.remove(m); });
   mBldgs=[];
   markMeshes.forEach(m=>scene.remove(m)); markMeshes=[];
@@ -478,4 +481,7 @@ export function buildScene(mapType){
   // Car spawn
   const {x:_sx, z:_sz} = tileCenter(HALF_W, HALF_H);
   sx = _sx; sz = _sz;
+
+  // 3-D landmark models (Paris only; no-op on random map)
+  buildLandmarks();
 }
