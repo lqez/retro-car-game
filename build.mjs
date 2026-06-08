@@ -17,8 +17,8 @@ const now = new Date();
 const pad = (n, l=2) => String(n).padStart(l, '0');
 const date = `${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate())}`;
 const time = `${pad(now.getHours())}${pad(now.getMinutes())}`;
-let serial = '001';
-try { serial = pad(parseInt(execSync('git rev-list --count HEAD',{encoding:'utf8'}).trim()), 3); } catch {}
+let serial = 'unknown';
+try { serial = execSync('git rev-parse --short=6 HEAD',{encoding:'utf8'}).trim(); } catch {}
 const VERSION = `${date}-${time}-${serial}`;
 
 // Fresh output directory
