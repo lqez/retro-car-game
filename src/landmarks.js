@@ -34,6 +34,7 @@ export function buildLandmarks() {
   buildInvalides();
   buildPompidou();
   buildPantheon();
+  buildMoulinRouge();
 }
 
 function buildArcDeTriomphe() {
@@ -926,4 +927,137 @@ function buildPantheon() {
   );
   finial.position.set(cx, 43, cz);
   add(finial);
+}
+
+function buildMoulinRouge() {
+  // World center: cx=-186, cz=-534 (tiles x=47-49, y=18-20, 3×3 block)
+  const cx = -186;
+  const cz = -534;
+  const PI = Math.PI;
+
+  const redMat     = new THREE.MeshToonMaterial({ color: 0xcc2233 });
+  const darkMat    = new THREE.MeshToonMaterial({ color: 0x441122 });
+  const strawMat   = new THREE.MeshToonMaterial({ color: 0xf5e8a0 });
+  const blackMat   = new THREE.MeshToonMaterial({ color: 0x221111 });
+
+  // 1. Main cabaret building
+  const mainBuilding = new THREE.Mesh(
+    new THREE.BoxGeometry(30, 16, 28),
+    redMat
+  );
+  mainBuilding.position.set(cx, 8, cz);
+  mainBuilding.castShadow = true;
+  mainBuilding.receiveShadow = true;
+  add(mainBuilding);
+
+  // 2. Front facade details — two arched window boxes
+  const leftWindow = new THREE.Mesh(
+    new THREE.BoxGeometry(8, 10, 2),
+    darkMat
+  );
+  leftWindow.position.set(cx - 8, 6, cz - 15);
+  leftWindow.castShadow = true;
+  add(leftWindow);
+
+  const rightWindow = new THREE.Mesh(
+    new THREE.BoxGeometry(8, 10, 2),
+    darkMat
+  );
+  rightWindow.position.set(cx + 8, 6, cz - 15);
+  rightWindow.castShadow = true;
+  add(rightWindow);
+
+  // 3. Windmill tower (cylindrical base)
+  const windmillTower = new THREE.Mesh(
+    new THREE.CylinderGeometry(4, 5, 18, 10),
+    redMat
+  );
+  windmillTower.position.set(cx + 10, 17, cz - 8);
+  windmillTower.castShadow = true;
+  add(windmillTower);
+
+  // 4. Windmill cap (octagonal top)
+  const windmillCap = new THREE.Mesh(
+    new THREE.CylinderGeometry(3, 4, 5, 8),
+    darkMat
+  );
+  windmillCap.position.set(cx + 10, 27.5, cz - 8);
+  windmillCap.castShadow = true;
+  add(windmillCap);
+
+  // 5. Windmill blades (4 flat rectangular sails)
+  // Blade 1 (vertical up)
+  const blade1 = new THREE.Mesh(
+    new THREE.BoxGeometry(2, 14, 1.5),
+    strawMat
+  );
+  blade1.position.set(cx + 10, 35, cz - 8);
+  blade1.castShadow = true;
+  add(blade1);
+
+  // Blade 2 (horizontal right)
+  const blade2 = new THREE.Mesh(
+    new THREE.BoxGeometry(2, 14, 1.5),
+    strawMat
+  );
+  blade2.rotation.z = PI / 2;
+  blade2.position.set(cx + 17, 28, cz - 8);
+  blade2.castShadow = true;
+  add(blade2);
+
+  // Blade 3 (vertical down)
+  const blade3 = new THREE.Mesh(
+    new THREE.BoxGeometry(2, 14, 1.5),
+    strawMat
+  );
+  blade3.position.set(cx + 10, 21, cz - 8);
+  blade3.castShadow = true;
+  add(blade3);
+
+  // Blade 4 (horizontal left)
+  const blade4 = new THREE.Mesh(
+    new THREE.BoxGeometry(2, 14, 1.5),
+    strawMat
+  );
+  blade4.rotation.z = PI / 2;
+  blade4.position.set(cx + 3, 28, cz - 8);
+  blade4.castShadow = true;
+  add(blade4);
+
+  // 6. Roof parapet/battlement (decorative top edge of front facade)
+  const parapet = new THREE.Mesh(
+    new THREE.BoxGeometry(32, 3, 4),
+    darkMat
+  );
+  parapet.position.set(cx, 17, cz - 15);
+  parapet.castShadow = true;
+  add(parapet);
+
+  // 7. Sign board (flat box on the front)
+  const signBoard = new THREE.Mesh(
+    new THREE.BoxGeometry(20, 4, 1),
+    redMat
+  );
+  signBoard.position.set(cx, 14, cz - 15.5);
+  signBoard.castShadow = true;
+  add(signBoard);
+
+  // 8. Two decorative round windows embedded in facade
+  const leftRoundWindow = new THREE.Mesh(
+    new THREE.CylinderGeometry(2.5, 2.5, 1, 16),
+    blackMat
+  );
+  leftRoundWindow.rotation.x = PI / 2;
+  leftRoundWindow.position.set(cx - 12, 12, cz - 15);
+  leftRoundWindow.castShadow = true;
+  add(leftRoundWindow);
+
+  const rightRoundWindow = new THREE.Mesh(
+    new THREE.CylinderGeometry(2.5, 2.5, 1, 16),
+    blackMat
+  );
+  rightRoundWindow.rotation.x = PI / 2;
+  rightRoundWindow.position.set(cx + 12, 12, cz - 15);
+  rightRoundWindow.castShadow = true;
+  add(rightRoundWindow);
 }

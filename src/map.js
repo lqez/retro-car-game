@@ -343,6 +343,8 @@ export function buildParis(){
   lmk(76,65,3,3);
   // Panthéon (3×4 at x=65-67, y=82-85; world cx=30, cz=240)
   lmk(65,82,3,4);
+  // Moulin Rouge (3×3 at x=47-49, y=18-20; world cx=-186, cz=-534)
+  lmk(47,18,3,3);
   // (sub-agents append lmk() calls here — one per landmark)
   // === END LANDMARK TILE RESERVATIONS ===
 
