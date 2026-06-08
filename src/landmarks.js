@@ -33,6 +33,7 @@ export function buildLandmarks() {
   buildOperaGarnier();
   buildInvalides();
   buildPompidou();
+  buildPantheon();
 }
 
 function buildArcDeTriomphe() {
@@ -831,4 +832,98 @@ function buildEiffelTower() {
   tip.position.set(cx, 99, cz);
   tip.castShadow = true;
   add(tip);
+}
+
+function buildPantheon() {
+  // World center: cx=30, cz=240 (tiles x=65-67, y=82-85, 3×4 block)
+  const cx = 30;
+  const cz = 240;
+  const PI = Math.PI;
+
+  const bodyMat     = new THREE.MeshToonMaterial({ color: 0xe0d8cc });
+  const colMat      = new THREE.MeshToonMaterial({ color: 0xf0ece4 });
+  const domeMat     = new THREE.MeshToonMaterial({ color: 0xc8c0b4 });
+  const pedMat      = new THREE.MeshToonMaterial({ color: 0xd4ccc0 });
+
+  // 1. Main rectangular body
+  const mainBody = new THREE.Mesh(
+    new THREE.BoxGeometry(32, 14, 42),
+    bodyMat
+  );
+  mainBody.position.set(cx, 7, cz);
+  mainBody.castShadow = true;
+  mainBody.receiveShadow = true;
+  add(mainBody);
+
+  // 2. Front portico pediment lower box
+  const pedimentLower = new THREE.Mesh(
+    new THREE.BoxGeometry(26, 4, 2),
+    bodyMat
+  );
+  pedimentLower.position.set(cx, 15, cz - 22);
+  pedimentLower.castShadow = true;
+  add(pedimentLower);
+
+  // 2b. Front Greek portico pediment (triangular gable)
+  const pedimentGable = new THREE.Mesh(
+    new THREE.BoxGeometry(26, 6, 2),
+    pedMat
+  );
+  pedimentGable.position.set(cx, 18, cz - 22);
+  pedimentGable.castShadow = true;
+  add(pedimentGable);
+
+  // 3. Six front columns on south facade
+  const colXPositions = [cx - 12, cx - 7, cx - 2, cx + 2, cx + 7, cx + 12];
+  for (const colX of colXPositions) {
+    const col = new THREE.Mesh(
+      new THREE.CylinderGeometry(1.4, 1.6, 14, 10),
+      colMat
+    );
+    col.position.set(colX, 7, cz - 22);
+    col.castShadow = true;
+    add(col);
+  }
+
+  // 4. Drum supporting the dome
+  const drum = new THREE.Mesh(
+    new THREE.CylinderGeometry(8, 9, 8, 20),
+    bodyMat
+  );
+  drum.position.set(cx, 19, cz);
+  drum.castShadow = true;
+  add(drum);
+
+  // 5. Outer dome colonnade ring (peristyle)
+  const colonnade = new THREE.Mesh(
+    new THREE.CylinderGeometry(10, 10, 3, 20, 1, true),
+    new THREE.MeshToonMaterial({ color: 0xd8d0c4 })
+  );
+  colonnade.position.set(cx, 20, cz);
+  add(colonnade);
+
+  // 6. Main dome
+  const dome = new THREE.Mesh(
+    new THREE.SphereGeometry(8.5, 16, 12, 0, PI * 2, 0, PI * 0.62),
+    domeMat
+  );
+  dome.position.set(cx, 27, cz);
+  dome.castShadow = true;
+  add(dome);
+
+  // 7. Lantern drum at top
+  const lantern = new THREE.Mesh(
+    new THREE.CylinderGeometry(2, 2.5, 5, 12),
+    domeMat
+  );
+  lantern.position.set(cx, 37, cz);
+  add(lantern);
+
+  // 8. Finial cross/spike
+  const finial = new THREE.Mesh(
+    new THREE.CylinderGeometry(0, 1, 6, 6),
+    new THREE.MeshToonMaterial({ color: 0xd0c8bc })
+  );
+  finial.position.set(cx, 43, cz);
+  add(finial);
 }
