@@ -87,6 +87,7 @@ export function build() {
       const x=x0+dx, y=y0+dy;
       if(x<0||x>=MAP_W||y<0||y>=MAP_H) continue;
       const id=mi(x,y);
+      if(tileMap[id]===T.ROAD||tileMap[id]===T.BRIDGE||tileMap[id]===T.WATER) continue;
       tileMap[id]=T.BUILDING; bldgW[id]=255;
     }
   }

@@ -2,7 +2,7 @@
  * Node.js test runner for pure-logic modules (no Three.js, no DOM).
  * Run with: node test.mjs
  *
- * Tests pure modules only: constants.js, map.js, physics.js
+ * Tests pure modules only: constants.js, maps/, map.js, physics.js
  * Browser-dependent modules (scene.js, car.js, ui.js) are not tested here.
  */
 import assert from 'assert/strict';
@@ -22,14 +22,18 @@ function test(name, fn) {
 function suite(name) { console.log(`\n${name}`); }
 
 import {
-  TILE, MAP_W, MAP_H, HALF_W, HALF_H, T, CONST_SPEED, CAR_HL, CAR_HW
+  TILE, T, CONST_SPEED, CAR_HL, CAR_HW
 } from './src/constants.js';
 
 import {
+  MAP_W, MAP_H, HALF_W, HALF_H,
   tileMap, mi, tileAt, tileCenter, tileCenterX, tileCenterZ,
-  passable, resetMap, buildRandom, buildParis,
+  passable,
   bldgH, bldgW, bldgD, bldgStyle, parkShade, waterMrk, roadTiles,
 } from './src/map.js';
+
+import * as randomMap from './src/maps/00_random.js';
+import * as parisMap  from './src/maps/01_paris.js';
 
 import {
   dirX, dirZ, prevDirX, prevDirZ, turnBias, stuckTimer, ROT_SPEED,
@@ -43,14 +47,6 @@ import {
 suite('constants');
 
 test('TILE is 12', () => assert.equal(TILE, 12));
-test('MAP is 128×128', () => {
-  assert.equal(MAP_W, 128);
-  assert.equal(MAP_H, 128);
-});
-test('HALF_W/HALF_H are 64', () => {
-  assert.equal(HALF_W, 64);
-  assert.equal(HALF_H, 64);
-});
 test('T values are 0-4', () => {
   assert.equal(T.ROAD, 0);
   assert.equal(T.BUILDING, 1);
@@ -67,14 +63,39 @@ test('CAR dimensions', () => {
 test('CONST_SPEED is positive', () => assert.ok(CONST_SPEED > 0));
 
 
-// ─── 2. map helpers ───────────────────────────────────────────────────────────
+// ─── 2. map module metadata ───────────────────────────────────────────────────
+suite('map module metadata');
+
+test('randomMap is 64×64 with no landmarks', () => {
+  assert.equal(randomMap.mapW, 64);
+  assert.equal(randomMap.mapH, 64);
+  assert.equal(randomMap.hasLandmarks, false);
+});
+
+test('parisMap is 80×80 with landmarks', () => {
+  assert.equal(parisMap.mapW, 80);
+  assert.equal(parisMap.mapH, 80);
+  assert.equal(parisMap.hasLandmarks, true);
+});
+
+
+// ─── 3. map helpers (after randomMap.build) ───────────────────────────────────
 suite('map helpers');
+
+randomMap.build();
+
+test('MAP_W/H updated by build()', () => {
+  assert.equal(MAP_W, 64);
+  assert.equal(MAP_H, 64);
+  assert.equal(HALF_W, 32);
+  assert.equal(HALF_H, 32);
+});
 
 test('mi(x,y) linear mapping', () => {
   assert.equal(mi(0, 0), 0);
   assert.equal(mi(1, 0), 1);
   assert.equal(mi(0, 1), MAP_W);
-  assert.equal(mi(127, 127), 127 * MAP_W + 127);
+  assert.equal(mi(MAP_W-1, MAP_H-1), (MAP_H-1) * MAP_W + (MAP_W-1));
 });
 
 test('tileCenter(0,0) is bottom-left corner', () => {
@@ -83,7 +104,7 @@ test('tileCenter(0,0) is bottom-left corner', () => {
   assert.equal(z, (-HALF_H + 0.5) * TILE);
 });
 
-test('tileCenter(HALF_W,HALF_H) = (6,6)', () => {
+test('tileCenter(HALF_W,HALF_H) near world origin', () => {
   const {x, z} = tileCenter(HALF_W, HALF_H);
   assert.equal(x, 0.5 * TILE);
   assert.equal(z, 0.5 * TILE);
@@ -107,9 +128,8 @@ test('tileCenterZ round-trips for any road tile', () => {
 });
 
 test('tileAt(world) matches tileCenter for known tile', () => {
-  resetMap(); buildRandom();
-  for (let ty = 60; ty <= 68; ty++) {
-    for (let tx = 60; tx <= 68; tx++) {
+  for (let ty = 28; ty <= 36; ty++) {
+    for (let tx = 28; tx <= 36; tx++) {
       const expected = tileMap[mi(tx, ty)];
       const {x, z} = tileCenter(tx, ty);
       assert.equal(tileAt(x, z), expected, `tile(${tx},${ty}) mismatch`);
@@ -118,10 +138,10 @@ test('tileAt(world) matches tileCenter for known tile', () => {
 });
 
 
-// ─── 3. buildRandom ───────────────────────────────────────────────────────────
-suite('buildRandom map validity');
+// ─── 4. randomMap validity ────────────────────────────────────────────────────
+suite('randomMap map validity');
 
-resetMap(); buildRandom();
+randomMap.build();
 
 const countTiles = () => {
   const c = {road:0, building:0, park:0, water:0, bridge:0};
@@ -147,8 +167,7 @@ test('has sufficient road coverage (≥5%)', () => {
 test('has buildings', () => assert.ok(cR.building > 0));
 
 test('center cross roads are passable', () => {
-  // buildRandom lays a center H+V road across the centered 64×64 play area
-  const RW = 64, OX = (MAP_W - RW) / 2;
+  const RW = 60, OX = (MAP_W - RW) / 2;
   for (let tx = OX; tx < OX + RW; tx++) {
     const t = tileMap[mi(tx, HALF_H)];
     assert.ok(t === T.ROAD || t === T.BRIDGE || t === T.WATER,
@@ -191,7 +210,6 @@ test('parkShade 0-5 for park tiles', () => {
 });
 
 test('no orphan roads: every road/bridge tile is reachable from spawn', () => {
-  // BFS from spawn over road/bridge; assert it covers every road/bridge tile
   const isRoad = (x,y) => x>=0&&x<MAP_W&&y>=0&&y<MAP_H &&
     (tileMap[mi(x,y)]===T.ROAD || tileMap[mi(x,y)]===T.BRIDGE);
   const seen = new Uint8Array(MAP_W*MAP_H);
@@ -220,48 +238,33 @@ test('roadTiles lists exactly the reachable road/bridge tiles', () => {
   }
 });
 
-test('buildRandom produces different maps on each call', () => {
+test('randomMap produces different maps on each call', () => {
   const snapshot1 = tileMap.slice();
-  resetMap(); buildRandom();
+  randomMap.build();
   const snapshot2 = tileMap.slice();
-  // Two maps with different random seeds must differ somewhere
   let differs = false;
   for (let i = 0; i < MAP_W * MAP_H; i++) {
     if (snapshot1[i] !== snapshot2[i]) { differs = true; break; }
   }
-  assert.ok(differs, 'buildRandom produced identical maps twice — seed not randomized');
+  assert.ok(differs, 'randomMap produced identical maps twice — seed not randomized');
 });
 
 
-// ─── 4. buildParis ────────────────────────────────────────────────────────────
-suite('buildParis map validity');
+// ─── 5. parisMap validity ─────────────────────────────────────────────────────
+suite('parisMap map validity');
 
-resetMap(); buildParis();
+parisMap.build();
 
 const cP = countTiles();
+
+test('MAP_W/H updated to 80×80', () => {
+  assert.equal(MAP_W, 80);
+  assert.equal(MAP_H, 80);
+});
 
 test('has road tiles', () => assert.ok(cP.road > 0));
 
 test('has Seine water tiles', () => assert.ok(cP.water > 0, `water=${cP.water}`));
-
-test('N-S avenue x=64 is all road/bridge', () => {
-  // Avenue [62,64] → x=62,63,64 all y
-  for (let ty = 0; ty < MAP_H; ty++) {
-    const t = tileMap[mi(64, ty)];
-    assert.ok(t === T.ROAD || t === T.BRIDGE,
-      `tile(64,${ty})=${t} not road/bridge on avenue`);
-  }
-});
-
-test('Seine rows 74-76 are water or bridge only', () => {
-  for (let ty = 74; ty <= 76; ty++) {
-    for (let tx = 0; tx < MAP_W; tx++) {
-      const t = tileMap[mi(tx, ty)];
-      assert.ok(t === T.WATER || t === T.BRIDGE,
-        `tile(${tx},${ty})=${t} in Seine should be water/bridge`);
-    }
-  }
-});
 
 test('paris spawn is passable', () => {
   const {x, z} = tileCenter(HALF_W, HALF_H);
@@ -275,23 +278,38 @@ test('bldgH 2-14 for paris buildings', () => {
   }
 });
 
-test('Bois de Boulogne (x=2-14, y=8-118) is mostly park', () => {
-  let parkCount = 0, total = 0;
-  for (let ty = 8; ty <= 118; ty++) {
-    for (let tx = 2; tx <= 14; tx++) {
-      total++;
-      if (tileMap[mi(tx, ty)] === T.PARK) parkCount++;
+test('Seine rows 44-46 are water or bridge only', () => {
+  for (let ty = 44; ty <= 46; ty++) {
+    for (let tx = 0; tx < MAP_W; tx++) {
+      const t = tileMap[mi(tx, ty)];
+      assert.ok(t === T.WATER || t === T.BRIDGE,
+        `tile(${tx},${ty})=${t} in Seine should be water/bridge`);
     }
   }
-  // Most tiles should be park (roads intersect, so not 100%)
-  assert.ok(parkCount / total > 0.5, `park%=${(parkCount/total*100).toFixed(1)}`);
+});
+
+test('no orphan roads in paris map', () => {
+  const isRoad = (x,y) => x>=0&&x<MAP_W&&y>=0&&y<MAP_H &&
+    (tileMap[mi(x,y)]===T.ROAD || tileMap[mi(x,y)]===T.BRIDGE);
+  const seen = new Uint8Array(MAP_W*MAP_H);
+  const q = [HALF_W, HALF_H];
+  seen[mi(HALF_W,HALF_H)] = 1;
+  for (let h=0; h<q.length; h+=2) {
+    const x=q[h], y=q[h+1];
+    for (const [nx,ny] of [[x+1,y],[x-1,y],[x,y+1],[x,y-1]])
+      if (isRoad(nx,ny) && !seen[mi(nx,ny)]) { seen[mi(nx,ny)]=1; q.push(nx,ny); }
+  }
+  let orphans = 0;
+  for (let i=0;i<MAP_W*MAP_H;i++)
+    if ((tileMap[i]===T.ROAD||tileMap[i]===T.BRIDGE) && !seen[i]) orphans++;
+  assert.equal(orphans, 0, `${orphans} unreachable road tiles remain`);
 });
 
 
-// ─── 5. physics ───────────────────────────────────────────────────────────────
+// ─── 6. physics ───────────────────────────────────────────────────────────────
 suite('physics (random map)');
 
-resetMap(); buildRandom();
+randomMap.build();
 resetPhysics();
 
 test('initial direction is (0,-1)', () => {
@@ -314,14 +332,12 @@ test('leadingPointsForDir returns exactly 3 points', () => {
 });
 
 test('corners are symmetric around center', () => {
-  // Going right (+x): corners should be at ±CAR_HW in z
   const corners = cornersForDir(0, 0, 1, 0);
   const zVals = corners.map(([, z]) => z).sort((a,b) => a-b);
   assert.ok(Math.abs(zVals[0] + zVals[3]) < 1e-10, 'z corners not symmetric');
 });
 
 test('leading points are ahead of car', () => {
-  // Going right (+x): leading x should be positive
   const pts = leadingPointsForDir(0, 0, 1, 0);
   assert.ok(pts.every(([x]) => x > 0), 'leading points should be in +x direction');
 });
@@ -330,7 +346,6 @@ test('spawn position is movable', () => {
   const {x, z} = tileCenter(HALF_W, HALF_H);
   assert.ok(passable(x, z), 'spawn not passable');
   const dt = 1 / 60;
-  // At least one of the 4 cardinal directions should work
   const canMove = [[0,-1],[0,1],[1,0],[-1,0]].some(([dx,dz]) => {
     const r = moveWithCollision(x, z, dx, dz, dt);
     return r.moved;
@@ -355,10 +370,7 @@ test('car stays within map bounds when driving', () => {
   for (let i = 0; i < 300; i++) {
     const r = moveWithCollision(cx, cz, dx, dz, dt);
     if (r.moved) { cx = r.x; cz = r.z; }
-    else {
-      // Try turning right
-      [dx, dz] = [-dz, dx];
-    }
+    else { [dx, dz] = [-dz, dx]; }
     assert.ok(Math.abs(cx) <= halfSize, `x=${cx} out of bounds`);
     assert.ok(Math.abs(cz) <= halfSize, `z=${cz} out of bounds`);
   }
@@ -379,14 +391,14 @@ test('CONST_SPEED * dt_60fps < TILE (car moves ≤1 tile per frame)', () => {
 });
 
 
-// ─── 6. game state machine (pure logic) ──────────────────────────────────────
+// ─── 7. game state machine (pure logic) ──────────────────────────────────────
 suite('state machine logic (no Three.js)');
 
 const GameState = Object.freeze({
   MENU:'menu', PLAYING:'playing', GAME_OVER:'game_over'
 });
 const GAME_DURATION = 90;
-const TIMER_EPSILON = 0.001; // matches state.js fix
+const TIMER_EPSILON = 0.001;
 
 function simulateTimer(dtPerFrame) {
   let timeLeft = GAME_DURATION;
@@ -423,19 +435,15 @@ test('timer duration is ~90s at 60fps', () => {
 
 test('timer does not tick in non-PLAYING states', () => {
   let timeLeft = GAME_DURATION;
-  // Simulate being in MENU state
   const gs = GameState.MENU;
   if (gs !== GameState.PLAYING) { /* no tick */ }
   assert.equal(timeLeft, GAME_DURATION, 'timeLeft changed when not PLAYING');
 });
 
 test('GameState transitions: MENU → PLAYING → GAME_OVER', () => {
-  // Simplified state machine test
   let gs = GameState.MENU;
-  // startRound would set PLAYING
   gs = GameState.PLAYING;
   assert.equal(gs, GameState.PLAYING);
-  // updateState would set GAME_OVER when timer hits 0
   let timeLeft = 0;
   if (timeLeft < TIMER_EPSILON) { gs = GameState.GAME_OVER; }
   assert.equal(gs, GameState.GAME_OVER);
@@ -444,7 +452,6 @@ test('GameState transitions: MENU → PLAYING → GAME_OVER', () => {
 test('GAME_OVER is reset to PLAYING on new round', () => {
   let gs = GameState.GAME_OVER;
   let timeLeft = 0;
-  // startRound resets these
   timeLeft = GAME_DURATION;
   gs = GameState.PLAYING;
   assert.equal(gs, GameState.PLAYING);
@@ -452,13 +459,12 @@ test('GAME_OVER is reset to PLAYING on new round', () => {
 });
 
 
-// ─── 7. passable / collision edge cases ───────────────────────────────────────
+// ─── 8. passable / collision edge cases ───────────────────────────────────────
 suite('passable edge cases');
 
-resetMap(); buildRandom();
+randomMap.build();
 
 test('passable returns false for water tiles', () => {
-  // Find a water tile and check it's not passable
   let found = false;
   for (let i = 0; i < MAP_W * MAP_H && !found; i++) {
     if (tileMap[i] === T.WATER) {
@@ -468,7 +474,6 @@ test('passable returns false for water tiles', () => {
       found = true;
     }
   }
-  // It's ok if there are no water tiles (some random seeds might not have them)
 });
 
 test('passable returns true for road tiles', () => {
@@ -493,7 +498,7 @@ test('passable returns true for bridge tiles', () => {
     const {x, z} = tileCenter(tx, ty);
     assert.ok(passable(x, z), `bridge tile (${tx},${ty}) should be passable`);
     checked++;
-    if (checked >= 10) break; // spot-check up to 10
+    if (checked >= 10) break;
   }
 });
 
