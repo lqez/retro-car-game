@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 
 export function buildLouvre(add) {
-  const cx = 36, cz = -48;
+  const cx = 48, cz = -48;
   const stoneMat = new THREE.MeshToonMaterial({ color: 0xd8cda8 });
   const roofMat  = new THREE.MeshToonMaterial({ color: 0x9a9488 });
   const courtMat = new THREE.MeshToonMaterial({ color: 0xc4b490 });

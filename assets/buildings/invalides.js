@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 
 export function buildInvalides(add) {
-  const cx = -240, cz = 240;
+  const cx = -240, cz = 192;
   const PI = Math.PI;
   const stoneMat = new THREE.MeshToonMaterial({ color: 0xbca080 });
   const roofMat  = new THREE.MeshToonMaterial({ color: 0x7a8090 });

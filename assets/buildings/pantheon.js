@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 
 export function buildPantheon(add) {
-  const cx = 30, cz = 240;
+  const cx = 66, cz = 192;
   const PI = Math.PI;
   const bodyMat = new THREE.MeshToonMaterial({ color: 0xe0d8cc });
   const colMat  = new THREE.MeshToonMaterial({ color: 0xf0ece4 });

@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 
 export function buildPompidou(add) {
-  const cx = 162, cz = 30;
+  const cx = 186, cz = -54;
   const PI = Math.PI;
 
   const body = new THREE.Mesh(new THREE.BoxGeometry(30, 20, 30), new THREE.MeshToonMaterial({ color: 0x889099 }));

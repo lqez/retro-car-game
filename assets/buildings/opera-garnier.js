@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 
 export function buildOperaGarnier(add) {
-  const cx = 96, cz = -468;
+  const cx = 72, cz = -264;
   const PI = Math.PI;
   const facadeMat = new THREE.MeshToonMaterial({ color: 0xe8d8b0 });
   const colMat    = new THREE.MeshToonMaterial({ color: 0xd8c898 });

@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 
 export function buildArcDeTriomphe(add) {
-  const cx = 0, cz = -132;
+  const cx = -12, cz = -108;
   const stoneMat    = new THREE.MeshToonMaterial({ color: 0xd4c090 });
   const reliefMat   = new THREE.MeshToonMaterial({ color: 0xbba870 });
   const archVoidMat = new THREE.MeshToonMaterial({ color: 0x222222 });

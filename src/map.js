@@ -81,7 +81,7 @@ export function buildRandom(){
   _s = (Date.now() ^ (Math.random() * 0xffffffff)) >>> 0;
 
   const RW=64, RH=64;
-  const OX=(MAP_W-RW)>>1, OY=(MAP_H-RH)>>1; // centre the 64×64 area in the 128×128 map
+  const OX=(MAP_W-RW)>>1, OY=(MAP_H-RH)>>1; // centre the 64×64 area in the 80×80 map
 
   for(let i=0;i<5;i++){
     if(rng()<0.5){
@@ -227,126 +227,97 @@ export function buildRandom(){
 
 // ─── buildParis ──────────────────────────────────────────────────────────────────────────
 export function buildParis(){
-  // Seine river
-  for(let y=74;y<=76;y++) for(let x=0;x<MAP_W;x++){
-    const id=mi(x,y);
-    tileMap[id]=T.WATER;
-    waterMrk[id]=1;
+  // Seine river — horizontal band through center
+  for(let y=44;y<=46;y++) for(let x=0;x<MAP_W;x++){
+    tileMap[mi(x,y)]=T.WATER; waterMrk[mi(x,y)]=1;
   }
 
-  // Helper: set road tile
   function road(x,y){
     if(x<0||x>=MAP_W||y<0||y>=MAP_H)return;
     tileMap[mi(x,y)]=T.ROAD;
   }
 
-  // Major E-W boulevards
-  const ewBoulevards=[
-    [16,17],[28,29],[40,41],[52,54],[62,63],[80,81],[92,93],[104,105]
-  ];
+  // Major E-W boulevards (2-wide)
+  const ewBoulevards=[[6,7],[14,15],[22,23],[32,33],[40,41],[50,51],[58,59],[66,67],[74,75]];
   for(const [y0,y1] of ewBoulevards)
     for(let y=y0;y<=y1;y++) for(let x=0;x<MAP_W;x++) road(x,y);
 
-  // Major N-S avenues
-  const nsAvenues=[
-    [16,17],[28,29],[40,41],[52,54],[62,64],[74,75],[86,87],[98,99],[110,111]
-  ];
+  // Major N-S avenues (2-wide)
+  const nsAvenues=[[6,7],[14,15],[22,23],[32,33],[40,41],[50,51],[60,61],[70,71]];
   for(const [x0,x1] of nsAvenues)
     for(let x=x0;x<=x1;x++) for(let y=0;y<MAP_H;y++) road(x,y);
 
-  // Smaller cross streets (1 wide)
-  const smallY=[22,34,46,57,69,86,98];
-  const smallX=[22,34,46,58,69,80,92,104];
+  // Small 1-wide cross streets
+  const smallY=[10,18,27,36,43,54,62,70];
+  const smallX=[10,18,27,36,46,55,65,75];
   for(const y of smallY) for(let x=0;x<MAP_W;x++) road(x,y);
   for(const x of smallX) for(let y=0;y<MAP_H;y++) road(x,y);
 
-  // Central plaza (Arc de Triomphe roundabout)
-  for(let y=49;y<=57;y++) for(let x=59;x<=68;x++) road(x,y);
-  // Arc de Triomphe monument: override center 4×4 back to BUILDING
-  for(let y=51;y<=54;y++) for(let x=62;x<=65;x++) tileMap[mi(x,y)]=T.BUILDING;
+  // Arc de Triomphe roundabout plaza (x=33-42, y=27-35)
+  for(let y=27;y<=35;y++) for(let x=33;x<=42;x++) road(x,y);
+  // Monument center (4×4 at x=37-40, y=29-32) — reset to BUILDING before pruneOrphanRoads
+  for(let y=29;y<=32;y++) for(let x=37;x<=40;x++) tileMap[mi(x,y)]=T.BUILDING;
 
-  // === EIFFEL TOWER EARLY: non-corner interior tiles → ROAD (before pruneOrphanRoads) ===
-  for(let y=82;y<=89;y++) for(let x=20;x<=27;x++){
-    const isCorner=(x<=21||x>=26)&&(y<=83||y>=88);
+  // Eiffel Tower early: non-corner interior tiles → ROAD (before pruneOrphanRoads)
+  for(let y=52;y<=59;y++) for(let x=8;x<=15;x++){
+    const isCorner=(x<=9||x>=14)&&(y<=53||y>=58);
     if(!isCorner) road(x,y);
   }
-  // === END EIFFEL TOWER EARLY ===
 
   // Convert road-over-water to bridge
   for(let i=0;i<MAP_W*MAP_H;i++)
-    if(tileMap[i]===T.ROAD&&waterMrk[i])tileMap[i]=T.BRIDGE;
+    if(tileMap[i]===T.ROAD&&waterMrk[i]) tileMap[i]=T.BRIDGE;
 
-  // Remove road pockets disconnected from the spawn, record connected road tiles
   pruneOrphanRoads();
 
   // Parks — only overwrite BUILDING tiles
   function park(x0,y0,x1,y1){
     const shade=(hash2(x0,y0)*6)|0;
     for(let y=y0;y<=y1;y++) for(let x=x0;x<=x1;x++){
-      if(x<0||x>=MAP_W||y<0||y>=MAP_H)continue;
+      if(x<0||x>=MAP_W||y<0||y>=MAP_H) continue;
       const id=mi(x,y);
-      if(tileMap[id]===T.BUILDING){
-        tileMap[id]=T.PARK;
-        parkShade[id]=shade;
-      }
+      if(tileMap[id]===T.BUILDING){ tileMap[id]=T.PARK; parkShade[id]=shade; }
     }
   }
 
-  // Large named parks
-  park(2,8,14,118);       // Bois de Boulogne
-  park(66,55,82,68);      // Tuileries Garden
-  park(42,84,58,100);     // Luxembourg Gardens
-  park(18,80,30,110);     // Champ de Mars
-  park(40,16,54,30);      // Parc Monceau
-  park(100,8,114,28);     // Parc de la Villette
-  park(94,84,112,100);    // Parc de Bercy
-  park(88,28,104,46);     // Buttes-Chaumont
+  park(1,6,5,70);       // Bois de Boulogne
+  park(40,34,52,42);    // Tuileries Garden
+  park(36,56,48,68);    // Luxembourg Gardens
+  park(8,52,18,70);     // Champ de Mars
+  park(26,6,34,14);     // Parc Monceau
+  park(62,4,72,14);     // Parc de la Villette
+  park(60,62,72,72);    // Parc de Bercy
+  park(56,16,66,28);    // Buttes-Chaumont
+  park(48,44,56,54);    // Jardin des Plantes
+  park(30,40,33,43);
+  park(54,26,57,29);
+  park(44,60,47,63);
 
-  // Small squares
-  park(32,62,35,65);
-  park(72,28,75,31);
-  park(46,68,49,71);
-
-  // Apply per-4x4 block shade for park tiles not already shaded
   for(let ty=0;ty<MAP_H;ty++) for(let tx=0;tx<MAP_W;tx++){
     const id=mi(tx,ty);
-    if(tileMap[id]===T.PARK && parkShade[id]===0){
+    if(tileMap[id]===T.PARK&&parkShade[id]===0)
       parkShade[id]=(hash2(Math.floor(tx/4),Math.floor(ty/4)*17)*6)|0;
-    }
   }
 
-  // === LANDMARK TILE RESERVATIONS (post-park; marks bldgW=255 so tiler skips them) ===
+  // Landmark tile reservations (post-park; bldgW=255 blocks greedy tiler)
   function lmk(x0,y0,w,h){
     for(let dy=0;dy<h;dy++) for(let dx=0;dx<w;dx++){
       const x=x0+dx, y=y0+dy;
       if(x<0||x>=MAP_W||y<0||y>=MAP_H) continue;
       const id=mi(x,y);
-      tileMap[id]=T.BUILDING;
-      bldgW[id]=255;
+      tileMap[id]=T.BUILDING; bldgW[id]=255;
     }
   }
-  // Arc de Triomphe monument center (4×4 at x=62-65, y=51-54; world 0,-132)
-  lmk(62,51,4,4);
-  // Eiffel Tower corner legs (2×2 each; Champ de Mars park set them to PARK, reset to BUILDING)
-  lmk(20,82,2,2); lmk(26,82,2,2); lmk(20,88,2,2); lmk(26,88,2,2);
-  // Notre-Dame Cathedral (4×3 at x=65-68, y=70-72; world cx=36, cz=90)
-  lmk(65,70,4,3);
-  // Sacré-Cœur Basilica (3×4 at x=55-57, y=18-21; world cx=-90, cz=-528)
-  lmk(55,18,3,4);
-  // Louvre Palace (4×4 at x=65-68, y=58-61; world cx=36, cz=-48)
-  lmk(65,58,4,4);
-  // Opéra Garnier (4×4 at x=70-73, y=23-26; world cx=96, cz=-468)
-  lmk(70,23,4,4);
-  // Les Invalides (4×4 at x=42-45, y=82-85; world cx=-240, cz=240)
-  lmk(42,82,4,4);
-  // Centre Pompidou (3×3 at x=76-78, y=65-67; world cx=162, cz=30)
-  lmk(76,65,3,3);
-  // Panthéon (3×4 at x=65-67, y=82-85; world cx=30, cz=240)
-  lmk(65,82,3,4);
-  // Moulin Rouge (3×3 at x=47-49, y=18-20; world cx=-186, cz=-534)
-  lmk(47,18,3,3);
-  // (sub-agents append lmk() calls here — one per landmark)
-  // === END LANDMARK TILE RESERVATIONS ===
+  lmk(37,29,4,4);                                       // Arc de Triomphe (cx=-12,  cz=-108)
+  lmk(8,52,2,2); lmk(14,52,2,2); lmk(8,58,2,2); lmk(14,58,2,2); // Eiffel corners (cx=-336,cz=192)
+  lmk(42,43,4,3);                                       // Notre-Dame      (cx=48,   cz=54)
+  lmk(22,2,3,4);                                        // Sacré-Cœur      (cx=-198, cz=-432)
+  lmk(42,34,4,4);                                       // Louvre          (cx=48,   cz=-48)
+  lmk(44,16,4,4);                                       // Opéra Garnier   (cx=72,   cz=-264)
+  lmk(18,54,4,4);                                       // Les Invalides   (cx=-240, cz=192)
+  lmk(54,34,3,3);                                       // Pompidou        (cx=186,  cz=-54)
+  lmk(44,54,3,4);                                       // Panthéon        (cx=66,   cz=192)
+  lmk(24,9,3,3);                                        // Moulin Rouge    (cx=-174, cz=-354)
 
   // Greedy rectangle tiling for buildings
   const free=(x,y)=> x>=0&&y>=0&&x<MAP_W&&y<MAP_H&&
@@ -370,7 +341,7 @@ export function buildParis(){
   // Height + style — Haussmann style, mostly low
   for(let ty=0;ty<MAP_H;ty++) for(let tx=0;tx<MAP_W;tx++){
     const id=mi(tx,ty);
-    if(tileMap[id]!==T.BUILDING||bldgW[id]===255)continue;
+    if(tileMap[id]!==T.BUILDING||bldgW[id]===255) continue;
     if(bldgW[id]===0){bldgW[id]=1; bldgD[id]=1;}
     const big=bldgW[id]>1||bldgD[id]>1;
     const hn=hash2(tx,ty);

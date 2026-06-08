@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 
 export function buildNotreDame(add) {
-  const cx = 36, cz = 90;
+  const cx = 48, cz = 54;
   const stoneMat = new THREE.MeshToonMaterial({ color: 0xb8a88a });
   const roofMat  = new THREE.MeshToonMaterial({ color: 0x887060 });
 

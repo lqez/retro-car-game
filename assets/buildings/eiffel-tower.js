@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 
 export function buildEiffelTower(add) {
-  const cx = -480, cz = 264;
+  const cx = -336, cz = 192;
   const PI = Math.PI;
   const ironMat     = new THREE.MeshToonMaterial({ color: 0xc47020 });
   const platformMat = new THREE.MeshToonMaterial({ color: 0x8b5810 });
