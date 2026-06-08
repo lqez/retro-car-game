@@ -1,5 +1,10 @@
 import { TILE, CAR_HL, CAR_HW, CONST_SPEED } from './constants.js';
 import { passable, tileCenterX, tileCenterZ } from './map.js';
+import { activeCharacter } from './characters.js';
+
+// Per-character collision half-extents (length 세로 / width 가로).
+const carHL = () => CAR_HL * (activeCharacter.colLenMul ?? 1.0);
+const carHW = () => CAR_HW * (activeCharacter.colWidMul ?? 1.0);
 
 // ─── direction state ─────────────────────────────────────────────────────────────
 export let dirX = 0, dirZ = -1;
@@ -7,7 +12,6 @@ export let prevDirX = 0, prevDirZ = -1;
 export let turnBias = 1;
 export let stuckTimer = 0;
 export let targetRotY = Math.atan2(-(-1), 0);
-export const ROT_SPEED = 18;
 
 export function resetPhysics(){
   dirX=0; dirZ=-1; prevDirX=0; prevDirZ=-1;
@@ -18,19 +22,21 @@ export function resetPhysics(){
 // ─── collision helpers ───────────────────────────────────────────────────────────
 export function cornersForDir(px,pz,ndX,ndZ){
   const rpX=-ndZ, rpZ=ndX;
+  const hl=carHL(), hw=carHW();
   return[
-    [px+ndX*CAR_HL+rpX*CAR_HW, pz+ndZ*CAR_HL+rpZ*CAR_HW],
-    [px+ndX*CAR_HL-rpX*CAR_HW, pz+ndZ*CAR_HL-rpZ*CAR_HW],
-    [px-ndX*CAR_HL+rpX*CAR_HW, pz-ndZ*CAR_HL+rpZ*CAR_HW],
-    [px-ndX*CAR_HL-rpX*CAR_HW, pz-ndZ*CAR_HL-rpZ*CAR_HW],
+    [px+ndX*hl+rpX*hw, pz+ndZ*hl+rpZ*hw],
+    [px+ndX*hl-rpX*hw, pz+ndZ*hl-rpZ*hw],
+    [px-ndX*hl+rpX*hw, pz-ndZ*hl+rpZ*hw],
+    [px-ndX*hl-rpX*hw, pz-ndZ*hl-rpZ*hw],
   ];
 }
 export function leadingPointsForDir(px,pz,ndX,ndZ){
   const rpX=-ndZ, rpZ=ndX;
-  const noseX=px+ndX*CAR_HL, noseZ=pz+ndZ*CAR_HL;
+  const hl=carHL(), hw=carHW();
+  const noseX=px+ndX*hl, noseZ=pz+ndZ*hl;
   return[
-    [noseX+rpX*CAR_HW, noseZ+rpZ*CAR_HW],
-    [noseX-rpX*CAR_HW, noseZ-rpZ*CAR_HW],
+    [noseX+rpX*hw, noseZ+rpZ*hw],
+    [noseX-rpX*hw, noseZ-rpZ*hw],
     [noseX, noseZ],
   ];
 }

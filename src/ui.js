@@ -1,5 +1,6 @@
 import { timeLeft, startRound, lossReason } from './state.js';
-import { calibrate, reqSensor, initJoystick } from './input.js';
+import { calibrate, reqSensor, initJoystick, requestGas, tiltAvailable } from './input.js';
+import { gasCharges, gasMax, clearGas } from './gas.js';
 import { CONST_SPEED, TILE, T } from './constants.js';
 import { MAP_W, MAP_H, HALF_W, HALF_H, tileMap, mi } from './map.js';
 import * as randomMap from './maps/00_random.js';
@@ -7,20 +8,21 @@ import * as parisMap  from './maps/01_paris.js';
 import { getDiamonds, collectedCount, totalCount, clearDiamonds } from './diamonds.js';
 import { getEnemies, clearEnemies } from './enemies.js';
 import { CHARACTERS, setActiveCharacter } from './characters.js';
-import { loadCharacterModel } from './car.js';
+import { loadCharacterModel, resetCrash } from './car.js';
 
 const DIAMOND_BLUE = '#2ad4ff';
 const ENEMY_RED    = '#ff4444';
 
 export let gameOn = false;
 
-let overlay, hud, recalBtn, returnBtn, gameOverMsg, btnStart;
+let overlay, hud, recalBtn, returnBtn, gameOverMsg, btnStart, gasBtn;
 let mapSelectEl, charSelectEl;
 let selectedMap = null;
 let starting = false;
 
+const START_BACKDROP_MS = 720;
 const MMAP_VIEW = 32; // tiles visible in the viewport
-const MMAP_PX   = 80;  // canvas pixel size
+let minimapPx = 80; // synced to CSS size
 let minimapEl, minimapCtx, minimapBg;
 
 let _ver = 'dev';
@@ -57,14 +59,24 @@ export function initUI(){
   const mapCards = document.querySelectorAll('.mapCard');
   function selectMap(id, map) {
     mapCards.forEach(b => b.classList.remove('active'));
-    document.getElementById(id).classList.add('active');
+    const selectedCard = document.getElementById(id);
+    selectedCard.classList.add('active');
     selectedMap = map;
+    const img = selectedCard.querySelector('img');
+    if(overlay && img){
+      overlay.style.setProperty('--city-bg', `url("${img.currentSrc || img.src}")`);
+      overlay.classList.add('hasCityBackdrop');
+      overlay.classList.remove('launching');
+    }
     btnStart.disabled = false;
   }
   document.getElementById('btnParis').addEventListener('click',  () => selectMap('btnParis',  parisMap));
   document.getElementById('btnRandom').addEventListener('click', () => selectMap('btnRandom', randomMap));
 
   recalBtn.addEventListener('click', calibrate);
+
+  gasBtn = document.getElementById('gasBtn');
+  if (gasBtn) gasBtn.addEventListener('click', requestGas);
 
   // Init joystick (pass canvas and recalBtn)
   const canvasEl = document.getElementById('c');
@@ -80,21 +92,28 @@ export async function startGame(){
   const ok=await reqSensor();
   if(!ok){starting=false;alert('센서 권한이 필요합니다.');return;}
   startRound(selectedMap);
-  calibrate();
-  overlay.style.display='none';
   hud.style.display='block';
-  recalBtn.style.display='block';
+  if(tiltAvailable){
+    calibrate();
+    recalBtn.style.display='block';
+  }else{
+    recalBtn.style.display='none';
+  }
+  if(gasBtn){ gasBtn.style.display='block'; gasBtn.disabled=false; gasBtn.textContent='GAS ×'+gasMax(); }
   initMinimap();
   gameOn=true;
+  overlay.classList.add('launching');
+  await new Promise(resolve => setTimeout(resolve, START_BACKDROP_MS));
+  overlay.style.display='none';
+  overlay.classList.remove('launching');
   starting=false;
 }
 
 function initMinimap(){
   minimapEl = document.getElementById('minimap');
   if(!minimapEl) return;
-  minimapEl.width = MMAP_PX;
-  minimapEl.height = MMAP_PX;
-  minimapCtx = minimapEl.getContext('2d');
+  minimapEl.style.display = 'block';
+  syncMinimapSize();
 
   // Precompute road-only map: transparent bg, solid gray for road/bridge
   minimapBg = document.createElement('canvas');
@@ -106,13 +125,27 @@ function initMinimap(){
     const t = tileMap[mi(tx,ty)];
     if(t===T.ROAD||t===T.BRIDGE) bgCtx.fillRect(tx,ty,1,1);
   }
-  minimapEl.style.display = 'block';
+}
+
+function syncMinimapSize(){
+  if(!minimapEl) return;
+  const cssPx = Math.max(1, Math.round(minimapEl.getBoundingClientRect().width));
+  if(minimapEl.width !== cssPx || minimapEl.height !== cssPx){
+    minimapEl.width = cssPx;
+    minimapEl.height = cssPx;
+    minimapPx = cssPx;
+  }
+  if(!minimapCtx){
+    minimapCtx = minimapEl.getContext('2d');
+  }
 }
 
 export function updateMinimap(carX, carZ){
   if(!minimapCtx||!minimapBg) return;
+  syncMinimapSize();
 
-  const R = MMAP_PX / 2;
+  const P = minimapPx;
+  const R = P / 2;
   minimapCtx.save();
 
   // Clip to circle
@@ -121,14 +154,14 @@ export function updateMinimap(carX, carZ){
   minimapCtx.clip();
 
   // Clear to transparent — CSS backdrop-filter+background handles the dark blur
-  minimapCtx.clearRect(0, 0, MMAP_PX, MMAP_PX);
+  minimapCtx.clearRect(0, 0, P, P);
 
   // 32×32 tile window centred on car; draw roads crisply (no interpolation)
   const cx = carX/TILE + HALF_W;
   const cz = carZ/TILE + HALF_H;
   const sx = cx - MMAP_VIEW/2, sy = cz - MMAP_VIEW/2;
   minimapCtx.imageSmoothingEnabled = false;
-  minimapCtx.drawImage(minimapBg, sx, sy, MMAP_VIEW, MMAP_VIEW, 0, 0, MMAP_PX, MMAP_PX);
+  minimapCtx.drawImage(minimapBg, sx, sy, MMAP_VIEW, MMAP_VIEW, 0, 0, P, P);
   minimapCtx.imageSmoothingEnabled = true;
 
   // Convex glass: edge vignette
@@ -137,7 +170,7 @@ export function updateMinimap(carX, carZ){
   vig.addColorStop(0.65,'rgba(0,5,20,0.06)');
   vig.addColorStop(1,   'rgba(0,5,30,0.52)');
   minimapCtx.fillStyle = vig;
-  minimapCtx.fillRect(0, 0, MMAP_PX, MMAP_PX);
+  minimapCtx.fillRect(0, 0, P, P);
 
   // Convex glass: specular highlight (top-left)
   const spec = minimapCtx.createRadialGradient(R*0.52, R*0.38, 0, R*0.52, R*0.38, R*0.5);
@@ -145,9 +178,9 @@ export function updateMinimap(carX, carZ){
   spec.addColorStop(0.4, 'rgba(255,255,255,0.05)');
   spec.addColorStop(1,   'rgba(255,255,255,0)');
   minimapCtx.fillStyle = spec;
-  minimapCtx.fillRect(0, 0, MMAP_PX, MMAP_PX);
+  minimapCtx.fillRect(0, 0, P, P);
 
-  const tilesToPx = MMAP_PX / MMAP_VIEW;
+  const tilesToPx = P / MMAP_VIEW;
   const edgeR = R - 4;
 
   // ── diamond markers ──────────────────────────────────────────────────────────
@@ -197,14 +230,16 @@ export function updateMinimap(carX, carZ){
   minimapCtx.restore();
 }
 
-export function updateHUD(dirArrow){
+export function updateHUD(dirArrow, speedMult = 1){
   if(!hud) return;
-  hud.textContent=`${dirArrow} ${(CONST_SPEED*3.6).toFixed(0)} km/h\n💎 ${collectedCount}/${totalCount}\n⏱ ${Math.ceil(timeLeft)}s`;
+  hud.textContent=`${dirArrow} ${(CONST_SPEED*speedMult*3.6).toFixed(0)} km/h\n💎 ${collectedCount}/${totalCount}\n⏱ ${Math.ceil(timeLeft)}s\n💨 ${gasCharges()}/${gasMax()}`;
+  if(gasBtn){ const n=gasCharges(); gasBtn.disabled=n<=0; gasBtn.textContent='GAS ×'+n; }
 }
 
 export function showGameOver(won, collected, total){
   hud.style.display='none';
   recalBtn.style.display='none';
+  if(gasBtn) gasBtn.style.display='none';
   if(minimapEl) minimapEl.style.display='none';
   if(gameOverMsg){
     let msg;
@@ -222,11 +257,16 @@ function returnToMenu(){
   if(gameOverMsg) gameOverMsg.style.display='none';
   gameOn=false;
   selectedMap=null;
+  if(gasBtn) gasBtn.style.display='none';
   clearDiamonds();
   clearEnemies();
+  clearGas();
+  resetCrash();
   minimapBg=null; minimapCtx=null; minimapEl=null;
   document.querySelectorAll('.mapCard').forEach(b => b.classList.remove('active'));
   if(btnStart) btnStart.disabled = true;
   mapSelectEl.style.display='flex';
+  overlay.classList.remove('launching', 'hasCityBackdrop');
+  overlay.style.removeProperty('--city-bg');
   overlay.style.display='flex';
 }

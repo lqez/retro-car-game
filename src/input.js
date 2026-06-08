@@ -1,19 +1,39 @@
+import { JOY_RADIUS as JOY_R, JOY_HOLD_MS, DOUBLE_TAP_MS } from './constants.js';
+
 // ─── keyboard ──────────────────────────────────────────────────────────────
 export const keys={};
 window.addEventListener('keydown',e=>{
-  if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code))e.preventDefault();
+  if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space'].includes(e.code))e.preventDefault();
+  if(e.code==='Space' && !e.repeat) requestGas();
   keys[e.code]=true;
 });
 window.addEventListener('keyup',e=>{keys[e.code]=false;});
 
+// ─── gas trigger (space / double-tap / GAS button) ──────────────────────────
+let gasReq=false;
+export function requestGas(){ if(getGameOn()) gasReq=true; }
+export function consumeGasRequest(){ const v=gasReq; gasReq=false; return v; }
+
 // ─── sensor ──────────────────────────────────────────────────────────────────
 export let rawBeta=0, rawGamma=0, baseBeta=0, baseGamma=0;
 export let sensorOk=false;
-window.addEventListener('deviceorientation',e=>{rawBeta=e.beta??0;rawGamma=e.gamma??0;});
+export let tiltAvailable=false;
+window.addEventListener('deviceorientation',e=>{
+  if(e.beta!=null || e.gamma!=null) tiltAvailable=true;
+  rawBeta=e.beta??0;rawGamma=e.gamma??0;
+});
 
 export async function reqSensor(){
-  if(typeof DeviceOrientationEvent?.requestPermission==='function'){
-    const r=await DeviceOrientationEvent.requestPermission();
+  const OrientationEvent = globalThis.DeviceOrientationEvent;
+  if(typeof OrientationEvent === 'undefined'){
+    tiltAvailable=false;
+    sensorOk=true;
+    return true;
+  }
+  tiltAvailable=true;
+  if(typeof OrientationEvent.requestPermission==='function'){
+    const r=await OrientationEvent.requestPermission();
+    tiltAvailable = r==='granted';
     return r==='granted';
   }
   return true;
@@ -22,7 +42,6 @@ export function calibrate(){baseBeta=rawBeta;baseGamma=rawGamma;sensorOk=true;}
 
 // ─── virtual joystick (touch hold 0.5s) ──────────────────────────────────────────────
 let joyEl, stickEl;
-const JOY_R   = 48;
 export let joyVisible = false;
 export let joyActive  = false;
 export let joyDX = 0, joyDY = 0;
@@ -72,7 +91,7 @@ export function initJoystick(canvasEl, recalBtn, gameOnGetter){
     touchId=t.identifier;
     const x=t.clientX, y=t.clientY;
     clearTimeout(holdTimer);
-    holdTimer=setTimeout(()=>showJoystick(x,y),500);
+    holdTimer=setTimeout(()=>showJoystick(x,y),JOY_HOLD_MS);
   },{passive:false});
 
   canvasEl.addEventListener('touchmove',e=>{
@@ -82,15 +101,23 @@ export function initJoystick(canvasEl, recalBtn, gameOnGetter){
     if(joyActive){ e.preventDefault(); moveStick(t.clientX,t.clientY); }
   },{passive:false});
 
+  let lastTap=0;
   function endTouch(e){
     if(touchId===null) return;
     if(![...e.changedTouches].some(c=>c.identifier===touchId)) return;
+    const wasJoy=joyActive;
     touchId=null;
     clearTimeout(holdTimer);
     if(joyActive){
       joyActive=false; joyDX=0; joyDY=0;
       stickEl.style.transform='translate(-50%,-50%)';
       fadeOutJoystick();
+    }
+    // A quick tap (joystick never engaged) → detect double-tap for gas.
+    if(!wasJoy){
+      const now=performance.now();
+      if(now-lastTap < DOUBLE_TAP_MS){ requestGas(); lastTap=0; }
+      else lastTap=now;
     }
   }
   canvasEl.addEventListener('touchend',endTouch);

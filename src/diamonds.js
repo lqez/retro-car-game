@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { scene } from './scene.js';
 import { TILE } from './constants.js';
 import { HALF_W, HALF_H, roadTiles, tileCenter } from './map.js';
+import { clearForDir, leadingClearForDir } from './physics.js';
 
 // ─── tunables ───────────────────────────────────────────────────────────────────────────────
 const DIAMOND_COUNT = 8;
@@ -19,6 +20,7 @@ const BURST_SPEED   = TILE * 3.2;
 const BURST_LIFE    = 0.45;
 const burstGeo = new THREE.SphereGeometry(TILE * 0.055, 4, 4);
 const burstMat = new THREE.MeshBasicMaterial({ color: 0x2ad4ff });
+const DIRS = [[1,0],[-1,0],[0,1],[0,-1]];
 
 // ─── shared geometry / material ───────────────────────────────────────────────────────────────
 const diamondGeo = new THREE.OctahedronGeometry(TILE * 0.30, 0);
@@ -42,9 +44,11 @@ export function placeDiamonds(spawnTx = HALF_W, spawnTy = HALF_H){
   clearDiamonds();
 
   // candidate road tiles, a comfortable distance from the spawn
-  const cand = roadTiles.filter(t =>
-    Math.abs(t.tx - spawnTx) + Math.abs(t.ty - spawnTy) > SPAWN_CLEAR
-  );
+  const cand = roadTiles.filter(t => {
+    if(Math.abs(t.tx - spawnTx) + Math.abs(t.ty - spawnTy) <= SPAWN_CLEAR) return false;
+    const {x,z} = tileCenter(t.tx,t.ty);
+    return DIRS.some(([dx,dz]) => clearForDir(x,z,dx,dz) && leadingClearForDir(x,z,dx,dz));
+  });
   // Fisher–Yates shuffle
   for(let i=cand.length-1;i>0;i--){
     const j=Math.floor(Math.random()*(i+1));

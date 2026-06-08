@@ -1,19 +1,31 @@
 import { scene, renderer, camera, composer,
-         setTopCamera, cameraLead, targetCameraLead, ZERO_CAMERA_LEAD,
+         setTopCamera, cameraPosLead, targetCameraPosLead,
+         cameraLookLead, targetCameraLookLead, ZERO_CAMERA_LEAD,
          sx, sz } from './scene.js';
-import { carGroup, carVisual, wheelMeshes, wR_, spawnEffects, updateParticles } from './car.js';
+import { carGroup, carVisual, wheelMeshes, wR_, spawnEffects, updateParticles,
+         startCrash, updateCrash, isCrashing } from './car.js';
 import { keys, joyActive, joyDX, joyDY, joyVisible,
          rawBeta, rawGamma, baseBeta, baseGamma,
-         calibrate, sensorOk } from './input.js';
+         calibrate, sensorOk, consumeGasRequest } from './input.js';
+import { useGas, updateGas } from './gas.js';
 import { dirX, dirZ, prevDirX, prevDirZ, turnBias, stuckTimer,
-         leadingClearForDir, moveWithCollision, targetRotY, ROT_SPEED,
+         leadingClearForDir, moveWithCollision, targetRotY,
          setDir, setPrevDir, setTurnBias, setStuckTimer, setTargetRotY } from './physics.js';
 import { GameState, gameState, updateState, winRound, loseRound, won, GAME_DURATION, timeLeft } from './state.js';
 import { gameOn, updateHUD, updateMinimap, showGameOver, initUI, startGame } from './ui.js';
 import { updateDiamonds, collectedCount, totalCount } from './diamonds.js';
 import { updateEnemies } from './enemies.js';
 import { HALF_W, HALF_H, tileMap, mi } from './map.js';
-import { CONST_SPEED, TILE, T } from './constants.js';
+import { tileProps } from './tiles.js';
+import { CONST_SPEED, TILE, ROT_SPEED,
+         MAX_LEAN, LEAN_HOLD, LEAN_LERP, MAX_CAM_TILT, CAM_TILT_LERP,
+         BUMP_AMP, BUMP_SIDE,
+         BUMP_ROLL_CHANCE, BUMP_ROLL_KICK, BUMP_ROLL_DECAY,
+         PARTICLE_INTERVAL,
+         CAMERA_POS_LEAD_DIST, CAMERA_POS_LEAD_LERP,
+         CAMERA_LOOK_LEAD_DIST, CAMERA_LOOK_LEAD_LERP,
+         CAMERA_FOLLOW_LERP } from './constants.js';
+import { activeCharacter } from './characters.js';
 
 // ─── init ─────────────────────────────────────────────────────────────────────────────
 initUI();
@@ -24,19 +36,26 @@ let wheelAngle    = 0;
 let last          = performance.now();
 let wasGameOver   = false;
 
-// ── driving feel ─────────────────────────────────────────────────────────────────────
-const MAX_LEAN     = 0.32;  // radians (~18°), exaggerated so it's visible top-down
-const LEAN_HOLD    = 0.45;  // seconds to sustain lean after a turn
-const LEAN_LERP    = 7;     // lerp speed (higher = snappier)
-const MAX_CAM_TILT = 0.04;  // radians (~2.3°) — very subtle camera rotation on turn
-const CAM_TILT_LERP = 3;    // slower than lean for inertial feel
-
+// ── driving feel (tunables in constants.js) ───────────────────────────────────────────
 let bumpT      = 0;
 let leanAngle  = 0;
 let leanTarget = 0;
 let leanTimer  = 0;
+let roughSide  = 0;
+let roughRoll  = 0;
 let camTilt    = 0;
+let camTiltTarget = 0;
+let camTiltTimer  = 0;
 let snapDirX   = 0, snapDirZ = -1;  // last committed direction, for turn detection
+let camFocusX  = 0, camFocusZ = 0;  // smoothed camera target (lags the car slightly)
+let prevGameOn = false;
+
+function angleDiff(target, current){
+  let diff = target - current;
+  while(diff > Math.PI)  diff -= Math.PI * 2;
+  while(diff < -Math.PI) diff += Math.PI * 2;
+  return diff;
+}
 
 // ─── tick ───────────────────────────────────────────────────────────────────────────────
 function tick(){
@@ -51,15 +70,30 @@ function tick(){
 
   if(_gameOn && _sensorOk){
 
+    // snap the camera onto the car at the start of a round (no initial glide)
+    if(!prevGameOn){
+      camFocusX = carGroup.position.x; camFocusZ = carGroup.position.z;
+      roughSide = 0;
+      roughRoll = 0;
+    }
+
     // ── terrain detection ─────────────────────────────────────────────────────────────
     const ctX      = Math.round(carGroup.position.x / TILE + HALF_W);
     const ctZ      = Math.round(carGroup.position.z / TILE + HALF_H);
-    const onBridge = tileMap[mi(ctX, ctZ)] === T.BRIDGE;
-    const speedMult = onBridge ? 0.8 : 1.0;
-    const eDt       = dt * speedMult;   // terrain-adjusted frame step for movement
+    const terrain = tileProps(tileMap[mi(ctX, ctZ)]);
+    const speedMult = terrain.speedMul * (activeCharacter.speedMul ?? 1.0);
+    const turnRotMul = Math.max(0.01, activeCharacter.rotMul ?? 1.0);
+    const eDt       = dt * speedMult;   // terrain- and character-adjusted frame step
+    const moveStep  = CONST_SPEED * eDt;
+
+    // gas: drain the request every frame (avoids carry-over past game-over),
+    // but only drop a cloud while actively playing
+    const gasReq = consumeGasRequest();
 
     // ── player steers (PLAYING only) ─────────────────────────────────────────────────
     if(_gState===GameState.PLAYING){
+      if(gasReq) useGas(carGroup.position.x, carGroup.position.z);
+
       let wantX=0, wantZ=0;
       if     (keys['ArrowUp']   ||keys['KeyW']) { wantX=0;  wantZ=-1; }
       else if(keys['ArrowDown'] ||keys['KeyS']) { wantX=0;  wantZ=1;  }
@@ -86,8 +120,8 @@ function tick(){
       }
 
       if((wantX!==0||wantZ!==0)&&(wantX!==dirX||wantZ!==dirZ)){
-        const wnx=carGroup.position.x+wantX*CONST_SPEED*dt;
-        const wnz=carGroup.position.z+wantZ*CONST_SPEED*dt;
+        const wnx=carGroup.position.x+wantX*moveStep;
+        const wnz=carGroup.position.z+wantZ*moveStep;
         if(leadingClearForDir(wnx,wnz,wantX,wantZ)){
           setPrevDir(dirX,dirZ);
           setDir(wantX,wantZ);
@@ -95,6 +129,12 @@ function tick(){
         }
       }
     }
+
+    // ── crash death takes over the car after an enemy hit; the wreck then stays put ────
+    // After a win the car keeps cruising (auto-drives) instead of freezing.
+    if(isCrashing()){
+      updateCrash(dt);
+    } else if(_gState===GameState.PLAYING || won){
 
     // ── move with terrain speed; auto-turn on wall hit ────────────────────────────────
     const move=moveWithCollision(carGroup.position.x,carGroup.position.z,dirX,dirZ,eDt);
@@ -123,8 +163,8 @@ function tick(){
       }
 
       for(const [tx,tz] of tries){
-        const tnx=carGroup.position.x+tx*CONST_SPEED*dt;
-        const tnz=carGroup.position.z+tz*CONST_SPEED*dt;
+        const tnx=carGroup.position.x+tx*moveStep;
+        const tnz=carGroup.position.z+tz*moveStep;
         if(leadingClearForDir(tnx,tnz,tx,tz)){
           const turnMove=moveWithCollision(carGroup.position.x,carGroup.position.z,tx,tz,eDt);
           if(!turnMove.moved)continue;
@@ -139,33 +179,50 @@ function tick(){
       }
     }
 
+    const nextTargetRotY = Math.atan2(-dirZ, dirX);
+
     // ── detect turn for lean (check after any direction change) ─────────────────────
     if(dirX !== snapDirX || dirZ !== snapDirZ){
-      const cross = snapDirX * dirZ - snapDirZ * dirX;
-      if(cross !== 0){ leanTarget = -cross * MAX_LEAN; leanTimer = LEAN_HOLD; }
+      const turnDiff = angleDiff(nextTargetRotY, carGroup.rotation.y);
+      if(Math.abs(turnDiff) > 0.001){
+        const turnSign = Math.sign(turnDiff);
+        leanTarget = turnSign * (MAX_LEAN / turnRotMul);
+        leanTimer = LEAN_HOLD / turnRotMul;
+        camTiltTarget = -turnSign * MAX_CAM_TILT;
+        camTiltTimer = LEAN_HOLD;
+      }
       snapDirX = dirX; snapDirZ = dirZ;
     }
 
     // ── visual rotation toward current direction ───────────────────────────────────────
-    setTargetRotY(Math.atan2(-dirZ, dirX));
-    let diff=targetRotY-carGroup.rotation.y;
-    while(diff>Math.PI)  diff-=Math.PI*2;
-    while(diff<-Math.PI) diff+=Math.PI*2;
-    carGroup.rotation.y+=Math.sign(diff)*Math.min(Math.abs(diff), ROT_SPEED*dt);
+    setTargetRotY(nextTargetRotY);
+    const diff = angleDiff(targetRotY, carGroup.rotation.y);
+    carGroup.rotation.y+=Math.sign(diff)*Math.min(Math.abs(diff), ROT_SPEED*turnRotMul*dt);
 
     // ── bump: rough road / stronger on bridge ─────────────────────────────────────────
-    bumpT += CONST_SPEED * speedMult * dt;
-    const bumpAmp = onBridge ? TILE * 0.055 : TILE * 0.018;
+    bumpT += CONST_SPEED * speedMult * terrain.bumpFreqMul * dt;
+    const bumpAmp = BUMP_AMP * terrain.bumpAmpMul;
+    const sideAmp = BUMP_SIDE * terrain.bumpSideMul;
+    const rollChance = BUMP_ROLL_CHANCE * terrain.bumpRollChanceMul;
+    const rollKick = BUMP_ROLL_KICK * terrain.bumpRollKickMul;
     const bump = Math.sin(bumpT * 0.042) * 0.50
                + Math.sin(bumpT * 0.110) * 0.35
                + Math.sin(bumpT * 0.270) * 0.15;
+    if(Math.random() < rollChance * dt * speedMult){
+      const sign = Math.random() < 0.5 ? -1 : 1;
+      roughSide += sign * sideAmp * (0.45 + Math.random() * 0.75);
+      roughRoll += sign * rollKick * (0.65 + Math.random() * 0.7);
+    }
+    roughSide += (0 - roughSide) * Math.min(1, BUMP_ROLL_DECAY * dt);
+    roughRoll += (0 - roughRoll) * Math.min(1, BUMP_ROLL_DECAY * dt);
     carVisual.position.y = bump * bumpAmp;
+    carVisual.position.z = roughSide;
 
     // ── lean: bank into turns ─────────────────────────────────────────────────────────
     leanTimer = Math.max(0, leanTimer - dt);
     const targetLean = leanTimer > 0 ? leanTarget : 0;
-    leanAngle += (targetLean - leanAngle) * Math.min(1, LEAN_LERP * dt);
-    carVisual.rotation.x = leanAngle;
+    leanAngle += (targetLean - leanAngle) * Math.min(1, LEAN_LERP * turnRotMul * dt);
+    carVisual.rotation.x = leanAngle + roughRoll;
 
     // ── wheel spin (no-op with GLB, but kept for particle compat) ─────────────────────
     wheelAngle -= CONST_SPEED * speedMult * dt / wR_;
@@ -173,52 +230,68 @@ function tick(){
 
     // ── particles ────────────────────────────────────────────────────────────────────
     particleTimer += dt;
-    if(particleTimer > 0.055){
+    if(particleTimer > PARTICLE_INTERVAL){
       particleTimer = 0;
       spawnEffects(carGroup.position.x, carGroup.position.z, dirX, dirZ, CONST_SPEED * speedMult);
     }
+
+    }  // end PLAYING driving block (skipped while crashing / after game over)
+
     updateParticles(dt);
+    updateGas(dt);
 
-    // ── camera tilt: follow lean direction, much more subtle ─────────────────────────
-    camTilt += (-leanAngle * (MAX_CAM_TILT / MAX_LEAN) - camTilt) * Math.min(1, CAM_TILT_LERP * dt);
+    // ── camera tilt: same turn direction as lean, but independent from rotMul ────────
+    camTiltTimer = Math.max(0, camTiltTimer - dt);
+    const targetCamTilt = camTiltTimer > 0 ? camTiltTarget : 0;
+    camTilt += (targetCamTilt - camTilt) * Math.min(1, CAM_TILT_LERP * dt);
 
-    // ── camera lead (original 32-unit offset) ────────────────────────────────────────
-    targetCameraLead.set(-dirX*32, 0, -dirZ*32);
-    cameraLead.lerp(targetCameraLead, 1-Math.exp(-2.4*dt));
-    setTopCamera(carGroup.position.x, carGroup.position.z, camTilt);
+    // ── camera follow: ease toward the car while playing (and on the win cruise);
+    //    freeze in place on crash / timeout ─────────────────────────────────────────────
+    if(_gState===GameState.PLAYING || won){
+      const f = 1 - Math.exp(-CAMERA_FOLLOW_LERP*dt);
+      camFocusX += (carGroup.position.x - camFocusX) * f;
+      camFocusZ += (carGroup.position.z - camFocusZ) * f;
+    }
+    targetCameraPosLead.set(dirX*CAMERA_POS_LEAD_DIST, 0, dirZ*CAMERA_POS_LEAD_DIST);
+    cameraPosLead.lerp(targetCameraPosLead, 1-Math.exp(-CAMERA_POS_LEAD_LERP*dt));
+    targetCameraLookLead.set(dirX*CAMERA_LOOK_LEAD_DIST, 0, dirZ*CAMERA_LOOK_LEAD_DIST);
+    cameraLookLead.lerp(targetCameraLookLead, 1-Math.exp(-CAMERA_LOOK_LEAD_LERP*dt));
+    setTopCamera(camFocusX, camFocusZ, camTilt);
 
     // ── diamonds: always update so pop animation finishes through game-over ──────────
     updateDiamonds(dt, carGroup.position.x, carGroup.position.z);
 
     // ── enemies: always update so they keep driving after game-over ──────────────────
-    const enemyHit = updateEnemies(dt, carGroup.position.x, carGroup.position.z);
+    const enemyHit = updateEnemies(dt, carGroup.position.x, carGroup.position.z, _gState===GameState.PLAYING);
 
     // ── win / lose (PLAYING only) ─────────────────────────────────────────────────────
     if(_gState===GameState.PLAYING){
       if(totalCount>0 && collectedCount>=totalCount) winRound();
-      if(enemyHit) loseRound();
+      if(enemyHit){ loseRound(); startCrash(dirX, dirZ); }
     }
 
     // ── timer + HUD (PLAYING only) ────────────────────────────────────────────────────
     if(_gState===GameState.PLAYING){
       updateState(dt);
       const dirArrow = dirX>0?'→':dirX<0?'←':dirZ<0?'↑':'↓';
-      updateHUD(dirArrow);
+      updateHUD(dirArrow, speedMult);
       updateMinimap(carGroup.position.x, carGroup.position.z);
     }
 
-    // ── game over check ───────────────────────────────────────────────────────────────
-    if(gameState===GameState.GAME_OVER && !wasGameOver){
+    // ── game over check (wait for the crash to land before showing the screen) ─────────
+    if(gameState===GameState.GAME_OVER && !wasGameOver && !isCrashing()){
       wasGameOver = true;
       showGameOver(won, collectedCount, totalCount);
     }
     if(gameState!==GameState.GAME_OVER) wasGameOver = false;
 
   }else if(!_gameOn){
-    cameraLead.lerp(ZERO_CAMERA_LEAD, 1-Math.exp(-2.4*dt));
+    cameraPosLead.lerp(ZERO_CAMERA_LEAD, 1-Math.exp(-CAMERA_POS_LEAD_LERP*dt));
+    cameraLookLead.lerp(ZERO_CAMERA_LEAD, 1-Math.exp(-CAMERA_LOOK_LEAD_LERP*dt));
     setTopCamera(sx, sz);
   }
 
+  prevGameOn = _gameOn;
   composer.render();
 }
 

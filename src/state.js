@@ -1,8 +1,9 @@
 import { buildScene, sx, sz } from './scene.js';
-import { carGroup } from './car.js';
+import { carGroup, resetCrash } from './car.js';
 import { resetPhysics } from './physics.js';
 import { placeDiamonds } from './diamonds.js';
 import { placeEnemies } from './enemies.js';
+import { resetGas } from './gas.js';
 
 export const GameState = Object.freeze({
   MENU:'menu', PLAYING:'playing', GAME_OVER:'game_over'
@@ -17,9 +18,11 @@ export let lossReason = 'timeout';  // 'timeout' | 'enemy' | 'win'
 export function startRound(mapModule){
   buildScene(mapModule);
   resetPhysics();
+  resetCrash();
   carGroup.position.set(sx, 0, sz);
   placeDiamonds();
   placeEnemies();
+  resetGas();
   timeLeft = GAME_DURATION;
   won = false;
   lossReason = 'timeout';

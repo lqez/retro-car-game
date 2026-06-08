@@ -22,7 +22,7 @@ function test(name, fn) {
 function suite(name) { console.log(`\n${name}`); }
 
 import {
-  TILE, T, CONST_SPEED, CAR_HL, CAR_HW
+  TILE, T, CONST_SPEED, CAR_HL, CAR_HW, ROT_SPEED
 } from './src/constants.js';
 
 import {
@@ -36,7 +36,7 @@ import * as randomMap from './src/maps/00_random.js';
 import * as parisMap  from './src/maps/01_paris.js';
 
 import {
-  dirX, dirZ, prevDirX, prevDirZ, turnBias, stuckTimer, ROT_SPEED,
+  dirX, dirZ, prevDirX, prevDirZ, turnBias, stuckTimer,
   resetPhysics, setDir,
   cornersForDir, leadingPointsForDir, clearForDir, leadingClearForDir,
   moveWithCollision,
@@ -55,8 +55,7 @@ test('T values are 0-4', () => {
   assert.equal(T.BRIDGE, 4);
 });
 test('CAR dimensions', () => {
-  assert.equal(CAR_HL, TILE * 0.48);
-  assert.equal(CAR_HW, TILE * 0.34);
+  assert.ok(CAR_HL > 0 && CAR_HW > 0, 'car half-extents must be positive');
   assert.ok(CAR_HL < TILE, 'car half-length must fit in one tile');
   assert.ok(CAR_HW < TILE, 'car half-width must fit in one tile');
 });

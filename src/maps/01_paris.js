@@ -1,7 +1,7 @@
 import { T } from '../constants.js';
 import { MAP_W, MAP_H, HALF_W, HALF_H,
          tileMap, waterMrk, bldgH, bldgStyle, bldgW, bldgD, parkShade,
-         initMap, mi, hash2, pruneOrphanRoads } from './common.js';
+         initMap, mi, hash2, pruneOrphanRoads } from '../map.js';
 
 export const mapW = 80, mapH = 80;
 export const hasLandmarks = true;

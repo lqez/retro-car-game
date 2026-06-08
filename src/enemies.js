@@ -1,17 +1,15 @@
 import * as THREE from 'three';
 import { scene } from './scene.js';
-import { TILE, CONST_SPEED } from './constants.js';
+import { TILE, CONST_SPEED, ENEMY_COUNT, ENEMY_SPEED,
+         ENEMY_TERRITORY_R as TERRITORY_R, ENEMY_DETECT_DIST as DETECT_DIST,
+         ENEMY_THINK_INTERVAL as THINK_INTERVAL, ENEMY_COLLIDE_DIST as COLLIDE_DIST,
+         ENEMY_SPAWN_CLEAR as SPAWN_CLEAR, ENEMY_STUN_TIME as STUN_TIME,
+         ENEMY_SPIN_SPEED as SPIN_SPEED, ENEMY_ROT_SPEED } from './constants.js';
 import { HALF_W, HALF_H, roadTiles, tileCenter } from './map.js';
-import { moveWithCollision, leadingClearForDir } from './physics.js';
+import { clearForDir, moveWithCollision, leadingClearForDir } from './physics.js';
+import { gasStunsAt } from './gas.js';
 
-// ─── tunables ─────────────────────────────────────────────────────────────────
-const ENEMY_COUNT    = 8;
-const ENEMY_SPEED    = 0.80;         // fraction of player speed
-const TERRITORY_R    = 14;           // max Manhattan tiles from home while chasing
-const DETECT_DIST    = TILE * 12;    // world-unit radius to start chasing
-const THINK_INTERVAL = 0.85;         // seconds between direction decisions
-const COLLIDE_DIST   = TILE * 0.82;  // center-to-center game-over trigger
-const SPAWN_CLEAR    = 10;           // min Manhattan tiles from player spawn
+// ─── tunables in constants.js (ENEMY_*) ─────────────────────────────────────────
 
 // ─── materials ────────────────────────────────────────────────────────────────
 const bodyMat      = new THREE.MeshToonMaterial({ color: 0x1a5fce });
@@ -89,6 +87,11 @@ function buildEnemyCar() {
 }
 
 let enemies = [];
+const DIRS = [[1,0],[-1,0],[0,1],[0,-1]];
+
+function validDirsAt(x, z) {
+  return DIRS.filter(([dx,dz]) => clearForDir(x,z,dx,dz) && leadingClearForDir(x,z,dx,dz));
+}
 
 export function clearEnemies() {
   for (const e of enemies) scene.remove(e.group);
@@ -98,23 +101,27 @@ export function clearEnemies() {
 export function placeEnemies(spawnTx = HALF_W, spawnTy = HALF_H) {
   clearEnemies();
 
-  const cand = roadTiles.filter(t =>
-    Math.abs(t.tx - spawnTx) + Math.abs(t.ty - spawnTy) > SPAWN_CLEAR
-  );
+  const cand = roadTiles
+    .map(t => {
+      const { x, z } = tileCenter(t.tx, t.ty);
+      return { ...t, x, z, dirs: validDirsAt(x, z) };
+    })
+    .filter(t =>
+      Math.abs(t.tx - spawnTx) + Math.abs(t.ty - spawnTy) > SPAWN_CLEAR &&
+      t.dirs.length > 0
+    );
   for (let i = cand.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [cand[i], cand[j]] = [cand[j], cand[i]];
   }
 
-  const DIRS = [[1,0],[-1,0],[0,1],[0,-1]];
   const n = Math.min(ENEMY_COUNT, cand.length);
   for (let i = 0; i < n; i++) {
-    const { tx, ty } = cand[i];
-    const { x, z }   = tileCenter(tx, ty);
+    const { tx, ty, x, z, dirs } = cand[i];
     const group = buildEnemyCar();
     group.position.set(x, 0, z);
     scene.add(group);
-    const [dx, dz] = DIRS[Math.floor(Math.random() * 4)];
+    const [dx, dz] = dirs[Math.floor(Math.random() * dirs.length)];
     enemies.push({
       group, x, z,
       homeTx: tx, homeTy: ty,
@@ -122,6 +129,7 @@ export function placeEnemies(spawnTx = HALF_W, spawnTy = HALF_H) {
       thinkTimer: Math.random() * THINK_INTERVAL,
       stuckTimer: 0,
       turnBias: Math.random() < 0.5 ? 1 : -1,
+      stunTimer: 0,
     });
   }
 }
@@ -134,14 +142,26 @@ function tileOf(wx, wz) {
 }
 
 // Update all enemies; returns true if any enemy collided with the player.
-export function updateEnemies(dt, carX, carZ) {
+// `chase` is false once the player is gone (crashed) — enemies then just wander.
+export function updateEnemies(dt, carX, carZ, chase = true) {
   let hitPlayer = false;
 
   for (const e of enemies) {
+    // ── gas stun: freeze in place and spin, ignore AI/movement ────────────────
+    if (gasStunsAt(e.x, e.z)) e.stunTimer = STUN_TIME;   // (re)trigger on contact
+    if (e.stunTimer > 0) {
+      e.stunTimer -= dt;
+      e.group.position.x = e.x;
+      e.group.position.z = e.z;
+      e.group.rotation.y += SPIN_SPEED * dt;
+      if ((e.x - carX) ** 2 + (e.z - carZ) ** 2 < COLLIDE_DIST * COLLIDE_DIST) hitPlayer = true;
+      continue;
+    }
+
     const { tx: curTx, ty: curTy } = tileOf(e.x, e.z);
     const inTerritory  = Math.abs(curTx - e.homeTx) + Math.abs(curTy - e.homeTy) <= TERRITORY_R;
     const distToPlayer = Math.hypot(e.x - carX, e.z - carZ);
-    const canChase     = distToPlayer < DETECT_DIST && inTerritory;
+    const canChase     = chase && distToPlayer < DETECT_DIST && inTerritory;
 
     // ── AI: choose direction periodically ─────────────────────────────────────
     e.thinkTimer -= dt;
@@ -217,7 +237,7 @@ export function updateEnemies(dt, carX, carZ) {
     let diff = tRotY - e.group.rotation.y;
     while (diff >  Math.PI) diff -= Math.PI * 2;
     while (diff < -Math.PI) diff += Math.PI * 2;
-    e.group.rotation.y += Math.sign(diff) * Math.min(Math.abs(diff), 18 * dt);
+    e.group.rotation.y += Math.sign(diff) * Math.min(Math.abs(diff), ENEMY_ROT_SPEED * dt);
 
     // ── player collision ──────────────────────────────────────────────────────
     if ((e.x - carX) ** 2 + (e.z - carZ) ** 2 < COLLIDE_DIST * COLLIDE_DIST) {

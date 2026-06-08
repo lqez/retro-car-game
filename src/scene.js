@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass }     from 'three/addons/postprocessing/RenderPass.js';
 import { ShaderPass }     from 'three/addons/postprocessing/ShaderPass.js';
-import { TILE, T } from './constants.js';
+import { TILE, T, CAM_FOV, CAM_HEIGHT, BARREL_K, FOG_NEAR, FOG_FAR } from './constants.js';
 import { MAP_W, MAP_H, HALF_W, HALF_H,
          tileMap, bldgW, bldgD, bldgH, bldgStyle, parkShade,
          mi, tileCenter, tileCenterX, tileCenterZ } from './map.js';
@@ -17,10 +17,10 @@ renderer.shadowMap.type    = THREE.PCFSoftShadowMap;
 
 export const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x87ceeb);
-scene.fog = new THREE.Fog(0x87ceeb, 200, 440);
+scene.fog = new THREE.Fog(0x87ceeb, FOG_NEAR, FOG_FAR);
 initLandmarks(scene);
 
-export const camera = new THREE.PerspectiveCamera(42,1,1,700);
+export const camera = new THREE.PerspectiveCamera(CAM_FOV,1,1,700);
 camera.up.set(0,0,-1);
 
 // ─── lighting ─────────────────────────────────────────────────────────────────────────────
@@ -49,18 +49,18 @@ const PARK_GREENS = [0x4a7a56,0x3d6b47,0x527a3a,0x466e40,0x3b6650,0x597848];
 export let sx=0, sz=0;
 
 // ─── camera helpers ───────────────────────────────────────────────────────────────────────
-const CAM_H=190;
 const BASE_CAMERA_UP = new THREE.Vector3(0,0,-1);
-export const CAMERA_POS_LEAD = 32;
-export const cameraLead = new THREE.Vector3();
-export const targetCameraLead = new THREE.Vector3();
+export const cameraPosLead = new THREE.Vector3();
+export const targetCameraPosLead = new THREE.Vector3();
+export const cameraLookLead = new THREE.Vector3();
+export const targetCameraLookLead = new THREE.Vector3();
 export const ZERO_CAMERA_LEAD = new THREE.Vector3();
 
 export function setTopCamera(x, z, upTilt = 0){
-  camera.position.set(x+cameraLead.x, CAM_H, z+cameraLead.z);
+  camera.position.set(x+cameraPosLead.x, CAM_HEIGHT, z+cameraPosLead.z);
   // upTilt rotates the camera view around the look axis (subtle turn effect)
   camera.up.set(Math.sin(upTilt), 0, -Math.cos(upTilt));
-  camera.lookAt(x, 0, z);
+  camera.lookAt(x+cameraLookLead.x, 0, z+cameraLookLead.z);
 }
 setTopCamera(sx,sz);
 
@@ -68,7 +68,7 @@ setTopCamera(sx,sz);
 const BarrelShader = {
   uniforms: {
     tDiffuse: { value: null },
-    k:        { value: 0.32 },
+    k:        { value: BARREL_K },
   },
   vertexShader: `
     varying vec2 vUv;
