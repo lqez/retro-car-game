@@ -1,4 +1,5 @@
-import { TILE, HALF_W, HALF_H } from './constants.js';
+import { TILE } from './constants.js';
+import { HALF_W, HALF_H } from './map.js';
 import { buildArcDeTriomphe } from '../assets/buildings/arc-de-triomphe.js';
 import { buildEiffelTower }   from '../assets/buildings/eiffel-tower.js';
 import { buildNotreDame }     from '../assets/buildings/notre-dame.js';

@@ -12,8 +12,8 @@ import { GameState, gameState, updateState, winRound, loseRound, won, GAME_DURAT
 import { gameOn, updateHUD, updateMinimap, showGameOver, initUI, startGame } from './ui.js';
 import { updateDiamonds, collectedCount, totalCount } from './diamonds.js';
 import { updateEnemies } from './enemies.js';
-import { tileMap, mi } from './map.js';
-import { CONST_SPEED, TILE, HALF_W, HALF_H, T } from './constants.js';
+import { HALF_W, HALF_H, tileMap, mi } from './map.js';
+import { CONST_SPEED, TILE, T } from './constants.js';
 
 // ─── init ─────────────────────────────────────────────────────────────────────────────
 initUI();

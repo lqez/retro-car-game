@@ -1,7 +1,9 @@
 import { timeLeft, startRound, lossReason } from './state.js';
 import { calibrate, reqSensor, initJoystick } from './input.js';
-import { CONST_SPEED, MAP_W, MAP_H, HALF_W, HALF_H, TILE, T } from './constants.js';
-import { tileMap, mi } from './map.js';
+import { CONST_SPEED, TILE, T } from './constants.js';
+import { MAP_W, MAP_H, HALF_W, HALF_H, tileMap, mi } from './map.js';
+import * as randomMap from './maps/00_random.js';
+import * as parisMap  from './maps/01_paris.js';
 import { getDiamonds, collectedCount, totalCount, clearDiamonds } from './diamonds.js';
 import { getEnemies, clearEnemies } from './enemies.js';
 
@@ -31,11 +33,11 @@ export function initUI(){
   if (verEl) verEl.textContent = _ver;
 
   document.getElementById('btnParis').addEventListener('click', () => {
-    selectedMap = 'paris';
+    selectedMap = parisMap;
     startGame();
   });
   document.getElementById('btnRandom').addEventListener('click', () => {
-    selectedMap = 'random';
+    selectedMap = randomMap;
     startGame();
   });
 

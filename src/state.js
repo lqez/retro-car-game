@@ -14,8 +14,8 @@ export let timeLeft = GAME_DURATION;
 export let won = false;
 export let lossReason = 'timeout';  // 'timeout' | 'enemy' | 'win'
 
-export function startRound(mapType){
-  buildScene(mapType);
+export function startRound(mapModule){
+  buildScene(mapModule);
   resetPhysics();
   carGroup.position.set(sx, 0, sz);
   placeDiamonds();
