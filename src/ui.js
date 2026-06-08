@@ -147,7 +147,7 @@ export function updateMinimap(carX, carZ){
     }
   }
 
-  // ── enemy markers (red dots / arrows) ───────────────────────────────────────
+  // ── enemy markers (red dots, in-view only) ──────────────────────────────────
   minimapCtx.fillStyle = ENEMY_RED;
   for(const e of getEnemies()){
     const dxp = (e.x - carX)/TILE * tilesToPx;
@@ -157,16 +157,6 @@ export function updateMinimap(carX, carZ){
       minimapCtx.beginPath();
       minimapCtx.arc(bx, by, 3, 0, Math.PI*2);
       minimapCtx.fill();
-    }else{
-      const ang = Math.atan2(dzp, dxp);
-      minimapCtx.save();
-      minimapCtx.translate(R + Math.cos(ang)*edgeR, R + Math.sin(ang)*edgeR);
-      minimapCtx.rotate(ang);
-      minimapCtx.beginPath();
-      minimapCtx.moveTo(4,0); minimapCtx.lineTo(-3,-3); minimapCtx.lineTo(-3,3);
-      minimapCtx.closePath();
-      minimapCtx.fill();
-      minimapCtx.restore();
     }
   }
 
