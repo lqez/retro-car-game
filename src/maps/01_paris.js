@@ -129,11 +129,15 @@ export function build() {
     }
   }
 
-  // Eiffel Tower — four corner legs only (2×2 each); interior is the crossroads
-  // carved above. Bottom legs overlap the y=58-59 boulevard and are left as road
-  // by lmk(), so the boulevard stays open and cars drive between the legs.
-  // (cx=-336, cz=192)
+  // Eiffel Tower — four corner legs (2×2 each); interior is the crossroads.
+  // lmk() skips ROAD tiles so the bottom legs (on the y=58-59 boulevard) need
+  // an explicit override after lmk() to become truly impassable.  (cx=-336, cz=192)
   lmk(8,52,2,2); lmk(14,52,2,2); lmk(8,58,2,2); lmk(14,58,2,2);
+  // Force all four 2×2 leg blocks to BUILDING+255 regardless of road status
+  for (const [x0,y0] of [[8,52],[14,52],[8,58],[14,58]])
+    for (let dy=0;dy<2;dy++) for (let dx=0;dx<2;dx++) {
+      const id=mi(x0+dx,y0+dy); tileMap[id]=T.BUILDING; bldgW[id]=255;
+    }
 
   lmk(37,29,4,4);                                        // Arc de Triomphe  (cx=-12,  cz=-108)
   lmk(42,43,4,3);                                        // Notre-Dame        (cx=48,   cz=54)
