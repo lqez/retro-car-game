@@ -40,8 +40,8 @@ new GLTFLoader().load('./assets/car.glb', (gltf) => {
   model.scale.setScalar(scale);
 
   // Rotate to face the car's local +X (game forward direction).
-  // Meshy AI models typically face -Z → rotate +90° around Y.
-  model.rotation.y = Math.PI / 2;
+  // This model faces local +Z by default → rotate 180° so front aligns with +X.
+  model.rotation.y = Math.PI;
 
   // Centre horizontally and sit on ground after scale + rotation
   const box2   = new THREE.Box3().setFromObject(model);
