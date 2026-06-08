@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <title>City Car</title>
 <style>
   *{box-sizing:border-box;margin:0;padding:0}
@@ -103,6 +103,17 @@
   function show(msg){var b=document.getElementById('errBox');if(b){b.style.display='block';b.textContent+=(b.textContent?'\n':'')+msg;}}
   window.onerror=function(msg,src,line,col,err){show('[ERR] '+msg+'\n  '+src+':'+line+':'+col+(err&&err.stack?'\n'+err.stack:''));return false;};
   window.addEventListener('unhandledrejection',function(e){var r=e.reason;show('[PROMISE] '+(r&&r.stack?r.stack:r));});
+  // Prevent pinch-zoom (iOS gesture events) and double-tap zoom
+  document.addEventListener('gesturestart',  function(e){e.preventDefault();},{passive:false});
+  document.addEventListener('gesturechange', function(e){e.preventDefault();},{passive:false});
+  document.addEventListener('gestureend',    function(e){e.preventDefault();},{passive:false});
+  document.addEventListener('touchmove', function(e){if(e.touches.length>1)e.preventDefault();},{passive:false});
+  var _lastTap=0;
+  document.addEventListener('touchend',function(e){
+    var now=Date.now();
+    if(now-_lastTap<300){e.preventDefault();}
+    _lastTap=now;
+  },{passive:false});
 })();
 </script>
 <script type="importmap">{"imports":{
