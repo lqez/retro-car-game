@@ -2,8 +2,8 @@ import * as THREE from 'three';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass }     from 'three/addons/postprocessing/RenderPass.js';
 import { ShaderPass }     from 'three/addons/postprocessing/ShaderPass.js';
-import { TILE, MAP_W, MAP_H, HALF_W, HALF_H, T } from './constants.js';
-import { resetMap, buildRandom, buildParis,
+import { TILE, T } from './constants.js';
+import { MAP_W, MAP_H, HALF_W, HALF_H,
          tileMap, bldgW, bldgD, bldgH, bldgStyle, parkShade,
          mi, tileCenter, tileCenterX, tileCenterZ } from './map.js';
 import { initLandmarks, clearLandmarks, buildLandmarks } from './landmarks.js';
@@ -33,13 +33,8 @@ sun.shadow.mapSize.set(2048,2048);
 Object.assign(sun.shadow.camera,{left:-200,right:200,top:200,bottom:-200,near:1,far:500});
 scene.add(sun);
 
-// ─── ground plane (map-independent, created once) ────────────────────────────────────────────
-const gnd = new THREE.Mesh(
-  new THREE.PlaneGeometry(MAP_W*TILE,MAP_H*TILE),
-  new THREE.MeshToonMaterial({color:0xaa9966})
-);
-gnd.rotation.x=-Math.PI/2; gnd.position.y=-0.1; gnd.receiveShadow=true;
-scene.add(gnd);
+// ─── ground plane — recreated per map in buildScene ──────────────────────────────────────────
+let gnd = null;
 
 export const D = new THREE.Object3D();
 
@@ -108,17 +103,22 @@ window.addEventListener('resize',onResize);
 onResize();
 
 // ─── buildScene ─────────────────────────────────────────────────────────────────────────────
-export function buildScene(mapType){
+export function buildScene(mapModule){
   // Remove old meshes before adding new ones
   clearLandmarks();
+  if(gnd){ scene.remove(gnd); gnd=null; }
   [mRoad,mBridge,mPark,mWater,...mBldgs].forEach(m=>{ if(m) scene.remove(m); });
   mBldgs=[];
   markMeshes.forEach(m=>scene.remove(m)); markMeshes=[];
 
-  resetMap();
+  mapModule.build();
 
-  if(mapType==='paris') buildParis();
-  else buildRandom();
+  gnd = new THREE.Mesh(
+    new THREE.PlaneGeometry(MAP_W*TILE, MAP_H*TILE),
+    new THREE.MeshToonMaterial({color:0xaa9966})
+  );
+  gnd.rotation.x=-Math.PI/2; gnd.position.y=-0.1; gnd.receiveShadow=true;
+  scene.add(gnd);
 
   // ─── scene geometry ───────────────────────────────────────────────────────────────────────
   const cnt = new Array(5).fill(0);
@@ -482,6 +482,6 @@ export function buildScene(mapType){
   const {x:_sx, z:_sz} = tileCenter(HALF_W, HALF_H);
   sx = _sx; sz = _sz;
 
-  // 3-D landmark models (Paris only; no-op on random map)
-  buildLandmarks();
+  // 3-D landmark models (Paris only)
+  if(mapModule.hasLandmarks) buildLandmarks();
 }

@@ -6,7 +6,7 @@
  * Run with: node build.mjs   (or: npm run build)
  */
 import { build } from 'esbuild';
-import { readFile, writeFile, mkdir, rm, readdir, copyFile } from 'node:fs/promises';
+import { readFile, writeFile, mkdir, rm, readdir, copyFile, stat } from 'node:fs/promises';
 import { execSync } from 'node:child_process';
 
 const OUT_DIR = 'public';
@@ -40,7 +40,10 @@ await build({
 // Copy static assets (GLB models, etc.) into public/assets/
 try {
   const files = await readdir('assets');
-  await Promise.all(files.map(f => copyFile(`assets/${f}`, `${OUT_DIR}/assets/${f}`)));
+  await Promise.all(files.map(async f => {
+    const s = await stat(`assets/${f}`);
+    if (s.isFile()) await copyFile(`assets/${f}`, `${OUT_DIR}/assets/${f}`);
+  }));
 } catch {}
 
 // Emit public/index.html from the root template, swapping the importmap +

@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { scene } from './scene.js';
-import { TILE, HALF_W, HALF_H, CONST_SPEED } from './constants.js';
-import { roadTiles, tileCenter } from './map.js';
+import { TILE, CONST_SPEED } from './constants.js';
+import { HALF_W, HALF_H, roadTiles, tileCenter } from './map.js';
 import { moveWithCollision, leadingClearForDir } from './physics.js';
 
 // ─── tunables ─────────────────────────────────────────────────────────────────
