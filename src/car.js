@@ -1,14 +1,15 @@
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { TILE } from './constants.js';
 import { scene } from './scene.js';
 
-// ─── car + character: cartoon 3D top-view vehicle ───────────────────────────────────────
-// Car faces local +X direction.
+// ─── groups ───────────────────────────────────────────────────────────────────
 export const carGroup  = new THREE.Group();
 export const carVisual = new THREE.Group();
 carGroup.add(carVisual);
 scene.add(carGroup);
 
+// Blob shadow
 const blobShadow = new THREE.Mesh(
   new THREE.CircleGeometry(TILE * 0.55, 20),
   new THREE.MeshBasicMaterial({color:0x000000, transparent:true, opacity:0.38, depthWrite:false})
@@ -17,91 +18,40 @@ blobShadow.rotation.x = -Math.PI / 2;
 blobShadow.position.y = 0.06;
 carGroup.add(blobShadow);
 
-const R = TILE * 0.24;
-
-// materials
-const redMat    = new THREE.MeshToonMaterial({ color: 0xd71920 });
-const darkRedMat= new THREE.MeshToonMaterial({ color: 0x8f1016 });
-const blackMat  = new THREE.MeshToonMaterial({ color: 0x151515 });
-const tireMat   = new THREE.MeshToonMaterial({ color: 0x050505 });
-const metalMat  = new THREE.MeshToonMaterial({ color: 0xd9d9d9 });
-const whiteMat  = new THREE.MeshToonMaterial({ color: 0xffffff });
-const skinMat   = new THREE.MeshToonMaterial({ color: 0xffd1a6 });
-const glassMat  = new THREE.MeshToonMaterial({ color: 0xffffff, transparent: true, opacity: 0.45 });
-const eyeMat    = new THREE.MeshBasicMaterial({ color: 0x111111 });
-const stripeMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
-
-function addBox(parent, size, pos, mat, cast = true) {
-  const mesh = new THREE.Mesh(new THREE.BoxGeometry(size[0], size[1], size[2]), mat);
-  mesh.position.set(pos[0], pos[1], pos[2]);
-  mesh.castShadow = cast; mesh.receiveShadow = true;
-  parent.add(mesh); return mesh;
-}
-function addSphere(parent, radius, pos, scale, mat, seg = 16) {
-  const mesh = new THREE.Mesh(new THREE.SphereGeometry(radius, seg, Math.max(8, seg * 0.7)), mat);
-  mesh.position.set(pos[0], pos[1], pos[2]);
-  mesh.scale.set(scale[0], scale[1], scale[2]);
-  mesh.castShadow = true; mesh.receiveShadow = true;
-  parent.add(mesh); return mesh;
-}
-function addCylinder(parent, radiusTop, radiusBottom, height, pos, rot, mat, seg = 16) {
-  const mesh = new THREE.Mesh(new THREE.CylinderGeometry(radiusTop, radiusBottom, height, seg), mat);
-  mesh.position.set(pos[0], pos[1], pos[2]);
-  mesh.rotation.set(rot[0], rot[1], rot[2]);
-  mesh.castShadow = true; mesh.receiveShadow = true;
-  parent.add(mesh); return mesh;
-}
-
-// ── vehicle body ──────────────────────────────────────────────────────────────────────────────
-addBox(carVisual, [R*2.9, R*0.52, R*2.15], [0, R*0.48+0.32, 0], redMat);
-
-addCylinder(carVisual, R*0.42, R*0.42, R*2.35,
-  [R*1.65, R*0.45+0.28, 0], [Math.PI/2, 0, 0], redMat, 20);
-
-[-R*0.55, R*0.55].forEach(z =>
-  addBox(carVisual, [R*0.12, R*0.12, R*0.28], [R*1.66, R*0.86, z], stripeMat, false));
-
-addBox(carVisual, [R*1.12, R*0.70, R*1.50], [-R*0.62, R*0.95+0.32, 0], darkRedMat);
-addBox(carVisual, [R*0.34, R*1.55, R*1.55], [-R*1.14, R*1.65+0.32, 0], redMat);
-
-[-R*0.82, R*0.82].forEach(z =>
-  addCylinder(carVisual, R*0.08, R*0.08, R*1.95,
-    [-R*0.82, R*1.72+0.32, z], [0, 0, 0], metalMat, 12));
-
-addSphere(carVisual, R*0.72, [R*0.72, R*0.92+0.32, 0], [1.25, 0.46, 0.95], redMat);
-addSphere(carVisual, R*0.56, [-R*0.10, R*1.20+0.32, 0], [0.95, 0.34, 0.78], glassMat);
-
-// ── wheels ──────────────────────────────────────────────────────────────────────────────────
+// Wheel meshes disabled (GLB is one solid mesh); keep exports for main.js compat
 export const wheelMeshes = [];
-const wheelRadius = R * 0.70;
-const wheelWidth  = R * 0.52;
-export const wR_ = wheelRadius; // alias used by tick() for spin rate
-const wheelGeo = new THREE.CylinderGeometry(wheelRadius, wheelRadius, wheelWidth, 18);
+export const wR_ = TILE * 0.24 * 0.70;
 
-[
-  [ R*0.85, wheelRadius+0.10,  R*1.22],
-  [ R*0.85, wheelRadius+0.10, -R*1.22],
-  [-R*1.05, wheelRadius+0.10,  R*1.22],
-  [-R*1.05, wheelRadius+0.10, -R*1.22],
-].forEach(([wx, wy, wz]) => {
-  const wheel = new THREE.Mesh(wheelGeo, tireMat);
-  wheel.rotation.x = Math.PI / 2;
-  wheel.position.set(wx, wy, wz);
-  wheel.castShadow = true; wheel.receiveShadow = true;
-  carVisual.add(wheel);
-  wheelMeshes.push(wheel);
+// ─── load GLB player car ─────────────────────────────────────────────────────
+new GLTFLoader().load('./assets/car.glb', (gltf) => {
+  const model = gltf.scene;
 
-  const hub = new THREE.Mesh(
-    new THREE.CylinderGeometry(wheelRadius*0.42, wheelRadius*0.42, wheelWidth*1.05, 14),
-    metalMat
-  );
-  hub.rotation.x = Math.PI / 2;
-  hub.position.copy(wheel.position);
-  hub.castShadow = true;
-  carVisual.add(hub);
+  model.traverse(child => {
+    if (child.isMesh) {
+      child.castShadow    = true;
+      child.receiveShadow = true;
+    }
+  });
+
+  // Scale so the longest horizontal extent ≈ car length (2 × CAR_HL = TILE * 0.96)
+  const box1 = new THREE.Box3().setFromObject(model);
+  const size  = box1.getSize(new THREE.Vector3());
+  const scale = (TILE * 0.96) / Math.max(size.x, size.z);
+  model.scale.setScalar(scale);
+
+  // Rotate to face the car's local +X (game forward direction).
+  // Meshy AI models typically face -Z → rotate +90° around Y.
+  model.rotation.y = Math.PI / 2;
+
+  // Centre horizontally and sit on ground after scale + rotation
+  const box2   = new THREE.Box3().setFromObject(model);
+  const centre = box2.getCenter(new THREE.Vector3());
+  model.position.set(-centre.x, -box2.min.y, -centre.z);
+
+  carVisual.add(model);
 });
 
-// ─── particles ────────────────────────────────────────────────────────────────────────────
+// ─── particles ────────────────────────────────────────────────────────────────
 const PCOUNT=60, SCOUNT=70;
 const pebbleGeo = new THREE.DodecahedronGeometry(0.24,0);
 const smokeGeo  = new THREE.SphereGeometry(0.42,6,5);
@@ -122,13 +72,12 @@ let pHead=0, sHead=0;
 
 export function spawnEffects(x,z,fwX,fwZ,spd){
   if(spd<5)return;
-  const px=-fwZ, pz=fwX; // perpendicular (local +Z in world)
-  const rCX=x-fwX*R*1.05, rCZ=z-fwZ*R*1.05;
+  const px=-fwZ, pz=fwX;
+  const rCX=x-fwX*TILE*0.24*1.05, rCZ=z-fwZ*TILE*0.24*1.05;
 
-  // rear-right and rear-left wheel world positions
   const wpos=[
-    [rCX+px*R*1.22, rCZ+pz*R*1.22],
-    [rCX-px*R*1.22, rCZ-pz*R*1.22],
+    [rCX+px*TILE*0.24*1.22, rCZ+pz*TILE*0.24*1.22],
+    [rCX-px*TILE*0.24*1.22, rCZ-pz*TILE*0.24*1.22],
   ];
 
   for(const [wx,wz] of wpos){
@@ -144,7 +93,6 @@ export function spawnEffects(x,z,fwX,fwZ,spd){
     m.visible=true;
   }
 
-  // smoke: 2 puffs per spawn, wide free drift
   for(let si=0;si<2;si++){
     const sidx=sHead%SCOUNT; sHead++;
     const s=sData[sidx], sm=smokeMeshes[sidx];
