@@ -28,6 +28,7 @@ export function buildLandmarks() {
   buildArcDeTriomphe();
   buildEiffelTower();
   buildNotreDame();
+  buildSacreCœur();
 }
 
 function buildArcDeTriomphe() {
@@ -179,6 +180,103 @@ function buildNotreDame() {
     buttress.castShadow = true;
     add(buttress);
   }
+}
+
+function buildSacreCœur() {
+  // World center: cx=-90, cz=-528 (tiles x=55-57, y=18-21, 3×4 block)
+  const cx = -90;
+  const cz = -528;
+  const PI = Math.PI;
+
+  const bodyMat   = new THREE.MeshToonMaterial({ color: 0xf5f0ea });
+  const baseMat   = new THREE.MeshToonMaterial({ color: 0xd0c8bc });
+  const detailMat = new THREE.MeshToonMaterial({ color: 0xe8e0d4 });
+
+  // 1. Elevated stone terrace/base
+  const terrace = new THREE.Mesh(
+    new THREE.BoxGeometry(32, 5, 44),
+    baseMat
+  );
+  terrace.position.set(cx, 2.5, cz);
+  terrace.receiveShadow = true;
+  add(terrace);
+
+  // 2. Main body
+  const mainBody = new THREE.Mesh(
+    new THREE.BoxGeometry(26, 14, 36),
+    bodyMat
+  );
+  mainBody.position.set(cx, 12, cz);
+  mainBody.castShadow = true;
+  mainBody.receiveShadow = true;
+  add(mainBody);
+
+  // 3. Central large dome (upper hemisphere)
+  const centralDome = new THREE.Mesh(
+    new THREE.SphereGeometry(10, 16, 12, 0, PI * 2, 0, PI * 0.6),
+    bodyMat
+  );
+  centralDome.position.set(cx, 26, cz);
+  centralDome.castShadow = true;
+  add(centralDome);
+
+  // 4. Front entrance bell tower body
+  const towerBody = new THREE.Mesh(
+    new THREE.BoxGeometry(8, 18, 8),
+    bodyMat
+  );
+  towerBody.position.set(cx, 9, cz + 18);
+  add(towerBody);
+
+  // Front entrance bell tower dome
+  const towerDome = new THREE.Mesh(
+    new THREE.SphereGeometry(5, 12, 8, 0, PI * 2, 0, PI * 0.6),
+    bodyMat
+  );
+  towerDome.position.set(cx, 27, cz + 18);
+  add(towerDome);
+
+  // 5. Two side turrets — left
+  const leftTurret = new THREE.Mesh(
+    new THREE.CylinderGeometry(3.5, 3.5, 16, 10),
+    bodyMat
+  );
+  leftTurret.position.set(cx - 14, 8, cz - 8);
+  leftTurret.castShadow = true;
+  add(leftTurret);
+
+  // Left turret cap
+  const leftCap = new THREE.Mesh(
+    new THREE.SphereGeometry(4, 10, 6, 0, PI * 2, 0, PI * 0.55),
+    bodyMat
+  );
+  leftCap.position.set(cx - 14, 19, cz - 8);
+  add(leftCap);
+
+  // Right turret
+  const rightTurret = new THREE.Mesh(
+    new THREE.CylinderGeometry(3.5, 3.5, 16, 10),
+    bodyMat
+  );
+  rightTurret.position.set(cx + 14, 8, cz - 8);
+  rightTurret.castShadow = true;
+  add(rightTurret);
+
+  // Right turret cap
+  const rightCap = new THREE.Mesh(
+    new THREE.SphereGeometry(4, 10, 6, 0, PI * 2, 0, PI * 0.55),
+    bodyMat
+  );
+  rightCap.position.set(cx + 14, 19, cz - 8);
+  add(rightCap);
+
+  // 6. Central dome tip (finial)
+  const finial = new THREE.Mesh(
+    new THREE.CylinderGeometry(0, 1.5, 5, 8),
+    detailMat
+  );
+  finial.position.set(cx, 37, cz);
+  add(finial);
 }
 
 function buildEiffelTower() {

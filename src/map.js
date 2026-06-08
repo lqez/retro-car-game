@@ -331,6 +331,8 @@ export function buildParis(){
   lmk(20,82,2,2); lmk(26,82,2,2); lmk(20,88,2,2); lmk(26,88,2,2);
   // Notre-Dame Cathedral (4×3 at x=65-68, y=70-72; world cx=36, cz=90)
   lmk(65,70,4,3);
+  // Sacré-Cœur Basilica (3×4 at x=55-57, y=18-21; world cx=-90, cz=-528)
+  lmk(55,18,3,4);
   // (sub-agents append lmk() calls here — one per landmark)
   // === END LANDMARK TILE RESERVATIONS ===
 
