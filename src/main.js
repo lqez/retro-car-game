@@ -25,14 +25,17 @@ let last          = performance.now();
 let wasGameOver   = false;
 
 // ── driving feel ─────────────────────────────────────────────────────────────────────
-const MAX_LEAN  = 0.32;   // radians (~18°), exaggerated so it's visible top-down
-const LEAN_HOLD = 0.45;   // seconds to sustain lean after a turn
-const LEAN_LERP = 7;      // lerp speed (higher = snappier)
+const MAX_LEAN     = 0.32;  // radians (~18°), exaggerated so it's visible top-down
+const LEAN_HOLD    = 0.45;  // seconds to sustain lean after a turn
+const LEAN_LERP    = 7;     // lerp speed (higher = snappier)
+const MAX_CAM_TILT = 0.04;  // radians (~2.3°) — very subtle camera rotation on turn
+const CAM_TILT_LERP = 3;    // slower than lean for inertial feel
 
-let bumpT     = 0;
-let leanAngle = 0;
+let bumpT      = 0;
+let leanAngle  = 0;
 let leanTarget = 0;
 let leanTimer  = 0;
+let camTilt    = 0;
 let snapDirX   = 0, snapDirZ = -1;  // last committed direction, for turn detection
 
 // ─── tick ───────────────────────────────────────────────────────────────────────────────
@@ -176,10 +179,13 @@ function tick(){
     }
     updateParticles(dt);
 
-    // ── camera: 2× stronger lead ──────────────────────────────────────────────────────
-    targetCameraLead.set(-dirX*64, 0, -dirZ*64);
+    // ── camera tilt: follow lean direction, much more subtle ─────────────────────────
+    camTilt += (leanAngle * (MAX_CAM_TILT / MAX_LEAN) - camTilt) * Math.min(1, CAM_TILT_LERP * dt);
+
+    // ── camera lead (original 32-unit offset) ────────────────────────────────────────
+    targetCameraLead.set(-dirX*32, 0, -dirZ*32);
     cameraLead.lerp(targetCameraLead, 1-Math.exp(-2.4*dt));
-    setTopCamera(carGroup.position.x, carGroup.position.z);
+    setTopCamera(carGroup.position.x, carGroup.position.z, camTilt);
 
     // ── diamonds: always update so pop animation finishes through game-over ──────────
     updateDiamonds(dt, carGroup.position.x, carGroup.position.z);

@@ -59,10 +59,11 @@ export const cameraLead = new THREE.Vector3();
 export const targetCameraLead = new THREE.Vector3();
 export const ZERO_CAMERA_LEAD = new THREE.Vector3();
 
-export function setTopCamera(x,z){
-  camera.position.set(x+cameraLead.x,CAM_H,z+cameraLead.z);
-  camera.up.copy(BASE_CAMERA_UP);
-  camera.lookAt(x,0,z);
+export function setTopCamera(x, z, upTilt = 0){
+  camera.position.set(x+cameraLead.x, CAM_H, z+cameraLead.z);
+  // upTilt rotates the camera view around the look axis (subtle turn effect)
+  camera.up.set(Math.sin(upTilt), 0, -Math.cos(upTilt));
+  camera.lookAt(x, 0, z);
 }
 setTopCamera(sx,sz);
 
