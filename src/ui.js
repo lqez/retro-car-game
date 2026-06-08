@@ -14,7 +14,7 @@ const ENEMY_RED    = '#ff4444';
 
 export let gameOn = false;
 
-let overlay, hud, recalBtn, returnBtn, gameOverMsg;
+let overlay, hud, recalBtn, returnBtn, gameOverMsg, btnStart;
 let mapSelectEl, charSelectEl;
 let selectedMap = null;
 let starting = false;
@@ -51,14 +51,18 @@ export function initUI(){
   });
 
   // ── map selection ─────────────────────────────────────────────────────────
-  document.getElementById('btnParis').addEventListener('click', () => {
-    selectedMap = parisMap;
-    startGame();
-  });
-  document.getElementById('btnRandom').addEventListener('click', () => {
-    selectedMap = randomMap;
-    startGame();
-  });
+  btnStart = document.getElementById('btnStart');
+  btnStart.addEventListener('click', startGame);
+
+  const mapCards = document.querySelectorAll('.mapCard');
+  function selectMap(id, map) {
+    mapCards.forEach(b => b.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+    selectedMap = map;
+    btnStart.disabled = false;
+  }
+  document.getElementById('btnParis').addEventListener('click',  () => selectMap('btnParis',  parisMap));
+  document.getElementById('btnRandom').addEventListener('click', () => selectMap('btnRandom', randomMap));
 
   recalBtn.addEventListener('click', calibrate);
 
@@ -71,7 +75,7 @@ export function initUI(){
 }
 
 export async function startGame(){
-  if(gameOn||starting||!selectedMap)return;
+  if(gameOn||starting||!selectedMap||btnStart?.disabled)return;
   starting=true;
   const ok=await reqSensor();
   if(!ok){starting=false;alert('센서 권한이 필요합니다.');return;}
@@ -221,6 +225,8 @@ function returnToMenu(){
   clearDiamonds();
   clearEnemies();
   minimapBg=null; minimapCtx=null; minimapEl=null;
+  document.querySelectorAll('.mapCard').forEach(b => b.classList.remove('active'));
+  if(btnStart) btnStart.disabled = true;
   mapSelectEl.style.display='flex';
   overlay.style.display='flex';
 }

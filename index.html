@@ -14,9 +14,6 @@
   }
   #mapSelect{display:flex;flex-direction:column;align-items:center;width:100%;}
   #overlay h1{color:#ffd400;font-size:clamp(2rem,7vw,4rem);font-weight:900;letter-spacing:4px;margin-bottom:10px;text-shadow:0 2px 20px rgba(255,212,0,.5);}
-  #overlay p{color:#ccc;font-size:clamp(.8rem,2.5vw,.95rem);margin-bottom:36px;text-align:center;max-width:300px;line-height:1.8;}
-  .mapBtn{padding:18px 36px;border:2px solid rgba(255,212,0,.5);border-radius:16px;font-size:clamp(1rem,3vw,1.2rem);font-weight:800;background:rgba(255,212,0,.12);color:#ffd400;cursor:pointer;transition:background .15s,transform .1s;}
-  .mapBtn:hover,.mapBtn:active{background:rgba(255,212,0,.28);transform:scale(.97);}
   #hud{position:fixed;top:12px;right:12px;color:#fff;background:rgba(0,0,0,.55);padding:8px 14px;border-radius:10px;font-size:14px;line-height:1.8;white-space:pre;z-index:10;display:none;font-variant-numeric:tabular-nums;}
   #recalBtn{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);padding:12px 28px;border:none;border-radius:999px;font-size:14px;font-weight:700;background:rgba(255,212,0,.92);color:#111;cursor:pointer;z-index:10;display:none;box-shadow:0 2px 12px rgba(0,0,0,.4);transition:opacity .35s;}
   #recalBtn.faded{opacity:0;pointer-events:none;}
@@ -27,13 +24,28 @@
   #returnBtn:active{transform:translate(-50%,-50%) scale(.95)}
   #minimap{position:fixed;bottom:16px;left:16px;width:80px;height:80px;border-radius:50%;border:1.5px solid rgba(180,210,255,.28);box-shadow:0 4px 18px rgba(0,0,60,.5),inset 0 1px 3px rgba(255,255,255,.15);z-index:10;display:none;background:rgba(0,0,0,.42);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);}
   #gameOverMsg{position:fixed;top:38%;left:50%;transform:translate(-50%,-50%);padding:14px 30px;border-radius:14px;background:rgba(0,0,0,.62);color:#fff;font-size:clamp(1rem,3.5vw,1.4rem);font-weight:800;text-align:center;z-index:15;display:none;white-space:nowrap;box-shadow:0 4px 24px rgba(0,0,0,.5);}
+
+  /* ── character cards ─────────────────────────────────────────── */
   .charBtn{display:flex;flex-direction:column;align-items:center;gap:6px;padding:8px 10px 10px;border:2px solid rgba(100,220,255,.35);border-radius:14px;background:rgba(100,220,255,.07);color:#64dcff;cursor:pointer;transition:background .15s,transform .12s,border-color .15s;width:96px;}
   .charBtn img{width:80px;height:80px;object-fit:contain;display:block;pointer-events:none;}
   .charBtn span{font-size:clamp(.82rem,2.2vw,.95rem);font-weight:800;line-height:1;}
   .charBtn:hover,.charBtn:active{background:rgba(100,220,255,.2);transform:scale(.96);}
   .charBtn.active{background:rgba(100,220,255,.25);border-color:#64dcff;box-shadow:0 0 16px rgba(100,220,255,.5);}
+
+  /* ── map cards ───────────────────────────────────────────────── */
+  .mapCard{display:flex;flex-direction:column;align-items:center;gap:7px;padding:12px 14px 13px;border:2px solid rgba(255,212,0,.35);border-radius:14px;background:rgba(255,212,0,.07);color:#ffd400;cursor:pointer;transition:background .15s,transform .12s,border-color .15s;width:110px;}
+  .mapCard .mapEmoji{font-size:2.6rem;line-height:1.1;}
+  .mapCard .mapName{font-size:clamp(.88rem,2.4vw,1rem);font-weight:800;}
+  .mapCard:hover,.mapCard:active{background:rgba(255,212,0,.18);transform:scale(.96);}
+  .mapCard.active{background:rgba(255,212,0,.22);border-color:#ffd400;box-shadow:0 0 16px rgba(255,212,0,.5);}
+
+  /* ── section label ───────────────────────────────────────────── */
   .sectionLabel{color:#888;font-size:clamp(.7rem,2vw,.8rem);letter-spacing:2px;text-transform:uppercase;margin-bottom:10px;}
 
+  /* ── start button ────────────────────────────────────────────── */
+  #btnStart{margin-top:26px;padding:15px 64px;border:none;border-radius:999px;font-size:clamp(1rem,3vw,1.2rem);font-weight:900;background:#ffd400;color:#111;cursor:pointer;box-shadow:0 4px 24px rgba(255,212,0,.45);transition:background .15s,transform .12s,opacity .2s;}
+  #btnStart:hover,#btnStart:active{background:#ffe033;transform:scale(.97);}
+  #btnStart:disabled{opacity:.3;cursor:default;transform:none !important;box-shadow:none;}
 </style>
 </head>
 <body>
@@ -41,25 +53,27 @@
 <div id="overlay">
   <h1>CITY CAR</h1>
   <div id="mapSelect">
+
     <!-- Character selection -->
     <p class="sectionLabel">캐릭터 선택</p>
-    <div id="charSelect" style="display:flex;flex-wrap:wrap;justify-content:center;gap:12px;margin-bottom:28px;">
+    <div id="charSelect" style="display:flex;flex-wrap:wrap;justify-content:center;gap:12px;margin-bottom:26px;">
       <button class="charBtn" data-char="han"><img src="./assets/car/han.png" alt="한"><span>한</span></button>
       <button class="charBtn" data-char="poong"><img src="./assets/car/poong.png" alt="풍장군"><span>풍장군</span></button>
       <button class="charBtn" data-char="elvers"><img src="./assets/car/elvers.png" alt="엘버스"><span>엘버스</span></button>
-
     </div>
+
     <!-- Map selection -->
     <p class="sectionLabel">도시 선택</p>
-    <p style="color:#ccc;font-size:clamp(.75rem,2.2vw,.88rem);margin-bottom:18px;text-align:center;max-width:300px;line-height:1.7;">
-      <span style="color:#888;">기기 기울기·조이스틱·방향키로 주행</span>
-    </p>
-    <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:16px;margin-bottom:0;">
-      <button class="mapBtn" id="btnParis">🗼 Paris</button>
-      <button class="mapBtn" id="btnRandom">🎲 Random</button>
+    <div id="mapCardSelect" style="display:flex;flex-wrap:wrap;justify-content:center;gap:14px;margin-bottom:4px;">
+      <button class="mapCard" id="btnParis"><span class="mapEmoji">🗼</span><span class="mapName">Paris</span></button>
+      <button class="mapCard" id="btnRandom"><span class="mapEmoji">🎲</span><span class="mapName">Random</span></button>
     </div>
+
+    <!-- Start button -->
+    <button id="btnStart" disabled>게임 시작</button>
+
   </div>
-  <div id="version" style="margin-top:20px;color:#444;font-size:0.68rem;font-family:monospace;letter-spacing:1px;"></div>
+  <div id="version" style="margin-top:18px;color:#444;font-size:0.68rem;font-family:monospace;letter-spacing:1px;"></div>
 </div>
 <div id="hud"></div>
 <button id="recalBtn">리캘리브레이션</button>
