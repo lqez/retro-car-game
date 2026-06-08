@@ -13,11 +13,16 @@ let starting = false;
 const MMAP_COLORS = ['#555566','#9ba7ad','#4a7a56','#3399dd','#997755'];
 let minimapEl, minimapCtx, minimapBg;
 
+let _ver = 'dev';
+try { _ver = __APP_VERSION__; } catch (_) {}
+
 export function initUI(){
   overlay    = document.getElementById('overlay');
   hud        = document.getElementById('hud');
   recalBtn   = document.getElementById('recalBtn');
   mapSelectEl   = document.getElementById('mapSelect');
+  const verEl = document.getElementById('version');
+  if (verEl) verEl.textContent = _ver;
 
   document.getElementById('btnParis').addEventListener('click', () => {
     selectedMap = 'paris';
