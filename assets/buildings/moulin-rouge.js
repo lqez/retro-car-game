@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 
 export function buildMoulinRouge(add) {
-  const cx = -174, cz = -354;
+  const cx = -150, cz = -354;
   const PI = Math.PI;
   const redMat   = new THREE.MeshToonMaterial({ color: 0xcc2233 });
   const darkMat  = new THREE.MeshToonMaterial({ color: 0x441122 });

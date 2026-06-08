@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 
 export function buildSacreCoeur(add) {
-  const cx = -198, cz = -432;
+  const cx = -246, cz = -432;
   const PI = Math.PI;
   const bodyMat   = new THREE.MeshToonMaterial({ color: 0xf5f0ea });
   const baseMat   = new THREE.MeshToonMaterial({ color: 0xd0c8bc });
