@@ -2,7 +2,7 @@
 // Central tuning knobs — adjust game feel / presentation (연출) from here.
 // Per-character overrides live in characters.js; pure layout/geometry detail
 // (road markings, building generation, particle velocity math) stays local to
-// scene.js / car.js.
+// scene.js / particles.js.
 // ════════════════════════════════════════════════════════════════════════════
 
 // ─── core grid ────────────────────────────────────────────────────────────────
@@ -125,13 +125,15 @@ export const DIAMOND_RING_SCALE   = 1.9;
 
 // ─── enemies ────────────────────────────────────────────────────────────────────
 export const ENEMY_COUNT          = 8;
-export const ENEMY_SPEED          = 0.95;        // fraction of player speed
-export const ENEMY_TERRITORY_R    = 20;          // max Manhattan tiles from home while chasing
+export const ENEMY_SPEED          = 0.90;        // fraction of player speed
+export const ENEMY_TERRITORY_R    = 18;          // max Manhattan tiles from home while chasing
 export const ENEMY_DETECT_DIST    = TILE * 12;   // world-unit radius to start chasing
-export const ENEMY_THINK_INTERVAL = 0.4;         // seconds between direction decisions
+export const ENEMY_THINK_INTERVAL = 0.5;         // seconds between direction decisions
 export const ENEMY_COLLIDE_DIST   = TILE * 0.82; // center-to-center game-over trigger
-export const ENEMY_SPAWN_CLEAR    = 10;          // min Manhattan tiles from player spawn
-export const ENEMY_STUN_TIME      = 3.0;         // seconds frozen after touching gas
+export const ENEMY_ENEMY_COLLIDE_DIST = TILE * 0.82; // center-to-center enemy crash trigger
+export const ENEMY_SPAWN_CLEAR    = 14;          // min Manhattan tiles from player spawn
+export const ENEMY_STUN_TIME      = 2.4;         // seconds frozen after touching gas
+export const ENEMY_STUN_FREE_TIME = 0.5;         // seconds immune to fresh stuns after recovery
 export const ENEMY_SPIN_SPEED     = 8.0;         // rad/s spin-in-place while stunned
 export const ENEMY_ROT_SPEED      = 18;          // visual yaw turn rate (rad/s)
 
@@ -143,6 +145,48 @@ export const CRASH_SPIN       = 20;           // end-over-end tumble rate (rad/s
 export const CRASH_SPIN_NOISE = 0.18;         // fraction of CRASH_SPIN wobble on other axes
 export const CRASH_BOUNCE     = 0.6;          // velocity kept when bouncing off a building
 export const CRASH_EMBED      = TILE * 0.14;  // depth the wreck buries below ground
+export const CRASH_DUST_COLOR = 0x998866;
+export const CRASH_SMOKE_COLOR = 0xddddcc;
+export const CRASH_DUST_BURST = Object.freeze({
+  pebbleCount: 10,
+  smokeCount: 8,
+  pebbleSpeedBase: 8,
+  pebbleSpeedRandom: 16,
+  pebbleUpBase: 6,
+  pebbleUpRandom: 14,
+  pebbleLifeBase: 0.4,
+  pebbleLifeRandom: 0.35,
+  smokeSpeedBase: 1,
+  smokeSpeedRandom: 4,
+  smokeUpBase: 0.6,
+  smokeUpRandom: 1.2,
+  smokeLifeBase: 1.6,
+  smokeLifeRandom: 1.0,
+  smokeStartScale: 1.0,
+  smokeGrowScale: 6.0,
+  smokeOpacity: 0.22,
+});
+export const EXPLOSION_FIRE_COLORS = Object.freeze([0xffd94a, 0xffaa22, 0xff6a1f, 0xff2f18]);
+export const EXPLOSION_SMOKE_COLOR = 0x15110f;
+export const EXPLOSION_BURST = Object.freeze({
+  sparkCount: 36,
+  sparkScale: 0.45,
+  sparkSpeedBase: 10,
+  sparkSpeedRandom: 24,
+  sparkUpBase: 10,
+  sparkUpRandom: 26,
+  sparkLifeBase: 0.28,
+  sparkLifeRandom: 0.38,
+  smokeCount: 10,
+  smokeLife: 2.0,
+  smokeSpeedBase: 0.4,
+  smokeSpeedRandom: 2.2,
+  smokeUpBase: 8,
+  smokeUpRandom: 5,
+  smokeStartScale: 0.55,
+  smokeGrowScale: 8.0,
+  smokeOpacity: 0.36,
+});
 
 // ─── input feel ────────────────────────────────────────────────────────────────
 export const JOY_RADIUS    = 48;   // joystick max stick travel (px)

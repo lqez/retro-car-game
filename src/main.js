@@ -2,8 +2,9 @@ import { scene, renderer, camera, composer,
          setTopCamera, cameraPosLead, targetCameraPosLead,
          cameraLookLead, targetCameraLookLead, ZERO_CAMERA_LEAD,
          sx, sz } from './scene.js';
-import { carGroup, carVisual, wheelMeshes, wR_, spawnEffects, updateParticles,
+import { carGroup, carVisual, wheelMeshes, wR_,
          startCrash, updateCrash, isCrashing } from './car.js';
+import { spawnEffects, updateParticles } from './particles.js';
 import { keys, joyActive, joyDX, joyDY, joyVisible,
          rawBeta, rawGamma, baseBeta, baseGamma,
          calibrate, sensorOk, consumeGasRequest } from './input.js';

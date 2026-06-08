@@ -1,13 +1,16 @@
 import * as THREE from 'three';
-import { scene } from './scene.js';
+import { scene, camera } from './scene.js';
 import { TILE, CONST_SPEED, ENEMY_SPEED,
          ENEMY_TERRITORY_R as TERRITORY_R, ENEMY_DETECT_DIST as DETECT_DIST,
          ENEMY_THINK_INTERVAL as THINK_INTERVAL, ENEMY_COLLIDE_DIST as COLLIDE_DIST,
+         ENEMY_ENEMY_COLLIDE_DIST as ENEMY_CRASH_DIST,
          ENEMY_SPAWN_CLEAR as SPAWN_CLEAR, ENEMY_STUN_TIME as STUN_TIME,
+         ENEMY_STUN_FREE_TIME as STUN_FREE_TIME,
          ENEMY_SPIN_SPEED as SPIN_SPEED, ENEMY_ROT_SPEED } from './constants.js';
 import { DEFAULT_GAMEPLAY, HALF_W, HALF_H, roadTiles, tileCenter } from './map.js';
 import { clearForDir, moveWithCollision, leadingClearForDir } from './physics.js';
 import { gasStunsAt } from './gas.js';
+import { explode } from './particles.js';
 
 // ─── tunables in constants.js (ENEMY_*) ─────────────────────────────────────────
 
@@ -88,9 +91,54 @@ function buildEnemyCar() {
 
 let enemies = [];
 const DIRS = [[1,0],[-1,0],[0,1],[0,-1]];
+const cameraFrustum = new THREE.Frustum();
+const cameraProjView = new THREE.Matrix4();
+const cameraPoint = new THREE.Vector3();
 
 function validDirsAt(x, z) {
   return DIRS.filter(([dx,dz]) => clearForDir(x,z,dx,dz) && leadingClearForDir(x,z,dx,dz));
+}
+
+function shuffle(items) {
+  for (let i = items.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [items[i], items[j]] = [items[j], items[i]];
+  }
+  return items;
+}
+
+function tileDist(aTx, aTy, bTx, bTy) {
+  return Math.abs(aTx - bTx) + Math.abs(aTy - bTy);
+}
+
+function tileKey(tx, ty) {
+  return `${tx},${ty}`;
+}
+
+function spreadHomes(candidates, count) {
+  const remaining = shuffle([...candidates]);
+  const picked = [];
+  if (count <= 0 || remaining.length === 0) return picked;
+
+  picked.push(remaining.pop());
+  while (picked.length < count && remaining.length > 0) {
+    let bestIdx = 0;
+    let bestScore = -Infinity;
+    for (let i = 0; i < remaining.length; i++) {
+      const h = remaining[i];
+      const minDist = picked.reduce(
+        (best, p) => Math.min(best, tileDist(h.tx, h.ty, p.tx, p.ty)),
+        Infinity
+      );
+      const score = minDist + Math.random() * 0.01;
+      if (score > bestScore) {
+        bestScore = score;
+        bestIdx = i;
+      }
+    }
+    picked.push(remaining.splice(bestIdx, 1)[0]);
+  }
+  return picked;
 }
 
 export function clearEnemies() {
@@ -101,35 +149,46 @@ export function clearEnemies() {
 export function placeEnemies(count = DEFAULT_GAMEPLAY.enemyCount, spawnTx = HALF_W, spawnTy = HALF_H) {
   clearEnemies();
 
-  const cand = roadTiles
+  const roadWithDirs = roadTiles
     .map(t => {
       const { x, z } = tileCenter(t.tx, t.ty);
       return { ...t, x, z, dirs: validDirsAt(x, z) };
     })
-    .filter(t =>
-      Math.abs(t.tx - spawnTx) + Math.abs(t.ty - spawnTy) > SPAWN_CLEAR &&
-      t.dirs.length > 0
-    );
-  for (let i = cand.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [cand[i], cand[j]] = [cand[j], cand[i]];
-  }
+    .filter(t => t.dirs.length > 0);
+  const spawnCand = roadWithDirs.filter(t => tileDist(t.tx, t.ty, spawnTx, spawnTy) > SPAWN_CLEAR);
+  const viableHomes = roadTiles.filter(home =>
+    spawnCand.some(t => tileDist(t.tx, t.ty, home.tx, home.ty) <= TERRITORY_R)
+  );
+  const homeCand = spreadHomes(
+    viableHomes,
+    Math.min(viableHomes.length, count * 3)
+  );
+  const usedSpawnTiles = new Set();
 
-  const n = Math.min(count, cand.length);
-  for (let i = 0; i < n; i++) {
-    const { tx, ty, x, z, dirs } = cand[i];
+  for (const home of homeCand) {
+    if (enemies.length >= count) break;
+
+    const spawnOptions = spawnCand.filter(t =>
+      tileDist(t.tx, t.ty, home.tx, home.ty) <= TERRITORY_R &&
+      !usedSpawnTiles.has(tileKey(t.tx, t.ty))
+    );
+    if (spawnOptions.length === 0) continue;
+
+    const spawn = spawnOptions[Math.floor(Math.random() * spawnOptions.length)];
+    usedSpawnTiles.add(tileKey(spawn.tx, spawn.ty));
     const group = buildEnemyCar();
-    group.position.set(x, 0, z);
+    group.position.set(spawn.x, 0, spawn.z);
     scene.add(group);
-    const [dx, dz] = dirs[Math.floor(Math.random() * dirs.length)];
+    const [dx, dz] = spawn.dirs[Math.floor(Math.random() * spawn.dirs.length)];
     enemies.push({
-      group, x, z,
-      homeTx: tx, homeTy: ty,
+      group, x: spawn.x, z: spawn.z,
+      homeTx: home.tx, homeTy: home.ty,
       dx, dz,
       thinkTimer: Math.random() * THINK_INTERVAL,
       stuckTimer: 0,
       turnBias: Math.random() < 0.5 ? 1 : -1,
       stunTimer: 0,
+      stunFreeTimer: 0,
     });
   }
 }
@@ -141,6 +200,64 @@ function tileOf(wx, wz) {
   };
 }
 
+function canStartStun(e) {
+  return e.stunTimer <= 0 && e.stunFreeTimer <= 0;
+}
+
+function startStun(e, nextDx = e.dx, nextDz = e.dz) {
+  e.stunTimer = STUN_TIME;
+  e.stunFreeTimer = 0;
+  e.dx = nextDx;
+  e.dz = nextDz;
+  e.thinkTimer = THINK_INTERVAL;
+  e.stuckTimer = 0;
+}
+
+function updateStunTimers(e, dt) {
+  if (e.stunFreeTimer > 0) e.stunFreeTimer = Math.max(0, e.stunFreeTimer - dt);
+  if (e.stunTimer <= 0) return false;
+
+  e.stunTimer = Math.max(0, e.stunTimer - dt);
+  if (e.stunTimer <= 0) e.stunFreeTimer = Math.max(e.stunFreeTimer, STUN_FREE_TIME);
+  return true;
+}
+
+function updateCameraFrustum() {
+  camera.updateMatrixWorld();
+  cameraProjView.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
+  cameraFrustum.setFromProjectionMatrix(cameraProjView);
+}
+
+function enemyCrashInView(a, b) {
+  cameraPoint.set((a.x + b.x) * 0.5, TILE * 0.25, (a.z + b.z) * 0.5);
+  return cameraFrustum.containsPoint(cameraPoint);
+}
+
+function resolveEnemyCrashes() {
+  const crashDistSq = ENEMY_CRASH_DIST * ENEMY_CRASH_DIST;
+  const stunnedThisFrame = new Set();
+  updateCameraFrustum();
+
+  for (let i = 0; i < enemies.length; i++) {
+    const a = enemies[i];
+    if (stunnedThisFrame.has(a) || !canStartStun(a)) continue;
+
+    for (let j = i + 1; j < enemies.length; j++) {
+      const b = enemies[j];
+      if (stunnedThisFrame.has(b) || !canStartStun(b)) continue;
+      if ((a.x - b.x) ** 2 + (a.z - b.z) ** 2 >= crashDistSq) continue;
+      if (!enemyCrashInView(a, b)) continue;
+
+      explode((a.x + b.x) * 0.5, (a.z + b.z) * 0.5);
+      startStun(a, -a.dx, -a.dz);
+      startStun(b, -b.dx, -b.dz);
+      stunnedThisFrame.add(a);
+      stunnedThisFrame.add(b);
+      break;
+    }
+  }
+}
+
 // Update all enemies; returns true if any enemy collided with the player.
 // `chase` is false once the player is gone (crashed) — enemies then just wander.
 export function updateEnemies(dt, carX, carZ, chase = true) {
@@ -148,13 +265,11 @@ export function updateEnemies(dt, carX, carZ, chase = true) {
 
   for (const e of enemies) {
     // ── gas stun: freeze in place and spin, ignore AI/movement ────────────────
-    if (gasStunsAt(e.x, e.z)) e.stunTimer = STUN_TIME;   // (re)trigger on contact
-    if (e.stunTimer > 0) {
-      e.stunTimer -= dt;
+    if (gasStunsAt(e.x, e.z) && canStartStun(e)) startStun(e);
+    if (updateStunTimers(e, dt)) {
       e.group.position.x = e.x;
       e.group.position.z = e.z;
       e.group.rotation.y += SPIN_SPEED * dt;
-      if ((e.x - carX) ** 2 + (e.z - carZ) ** 2 < COLLIDE_DIST * COLLIDE_DIST) hitPlayer = true;
       continue;
     }
 
@@ -244,6 +359,8 @@ export function updateEnemies(dt, carX, carZ, chase = true) {
       hitPlayer = true;
     }
   }
+
+  resolveEnemyCrashes();
 
   return hitPlayer;
 }
