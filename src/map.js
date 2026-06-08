@@ -48,6 +48,32 @@ export function resetMap(){
   tileMap.fill(T.BUILDING); waterMrk.fill(0);
   bldgH.fill(0); bldgStyle.fill(0);
   bldgW.fill(0); bldgD.fill(0); parkShade.fill(0);
+  roadTiles.length = 0;
+}
+
+// ─── connectivity: drop road tiles unreachable from the spawn, list the rest ───────────────
+// Reachable road/bridge tiles (populated by pruneOrphanRoads); used for diamond placement.
+export const roadTiles = [];
+export function pruneOrphanRoads(startTx=HALF_W, startTy=HALF_H){
+  const isRoad=(x,y)=> x>=0&&x<MAP_W&&y>=0&&y<MAP_H &&
+                       (tileMap[mi(x,y)]===T.ROAD||tileMap[mi(x,y)]===T.BRIDGE);
+  const seen=new Uint8Array(MAP_W*MAP_H);
+  const q=[];
+  if(isRoad(startTx,startTy)){ seen[mi(startTx,startTy)]=1; q.push(startTx,startTy); }
+  let h=0;
+  while(h<q.length){
+    const x=q[h++], y=q[h++];
+    const nb=[[x+1,y],[x-1,y],[x,y+1],[x,y-1]];
+    for(const [nx,ny] of nb)
+      if(isRoad(nx,ny)&&!seen[mi(nx,ny)]){ seen[mi(nx,ny)]=1; q.push(nx,ny); }
+  }
+  roadTiles.length=0;
+  for(let ty=0;ty<MAP_H;ty++) for(let tx=0;tx<MAP_W;tx++){
+    const id=mi(tx,ty);
+    if(tileMap[id]!==T.ROAD&&tileMap[id]!==T.BRIDGE)continue;
+    if(seen[id]) roadTiles.push({tx,ty});
+    else { tileMap[id]=T.BUILDING; waterMrk[id]=0; } // orphan → rebuild as building
+  }
 }
 
 // ─── buildRandom ───────────────────────────────────────────────────────────────────────────
@@ -109,6 +135,9 @@ export function buildRandom(){
     if(tileMap[i]===T.ROAD&&waterMrk[i])tileMap[i]=T.BRIDGE;
   }
 
+  // Remove road pockets disconnected from the spawn, record connected road tiles
+  pruneOrphanRoads();
+
   // ── large solid parks ────────────────────────────────────────────────────────────────
   for(let i=0;i<14;i++){
     const px=OX+4+Math.floor(rng()*(RW-16)),py=OY+4+Math.floor(rng()*(RH-16));
@@ -168,10 +197,12 @@ export function buildRandom(){
     for(let dy=0;dy<d;dy++) for(let dx=0;dx<w;dx++)
       if(dx!==0||dy!==0) bldgW[mi(bx+dx,by+dy)]=255;
   }
-  for(let ty=OY;ty<OY+RH;ty++) for(let tx=OX;tx<OX+RW;tx++) claim(tx,ty);
+  // Tile buildings across the whole map (the band outside the 64×64 play area
+  // becomes a short building border framing the city).
+  for(let ty=0;ty<MAP_H;ty++) for(let tx=0;tx<MAP_W;tx++) claim(tx,ty);
 
   // ── height + style ────────────────────────────────────────────────────────────────────
-  for(let ty=OY;ty<OY+RH;ty++) for(let tx=OX;tx<OX+RW;tx++){
+  for(let ty=0;ty<MAP_H;ty++) for(let tx=0;tx<MAP_W;tx++){
     const id=mi(tx,ty);
     if(tileMap[id]!==T.BUILDING||bldgW[id]===255)continue;
     if(bldgW[id]===0){bldgW[id]=1; bldgD[id]=1;}
@@ -235,6 +266,9 @@ export function buildParis(){
   // Convert road-over-water to bridge
   for(let i=0;i<MAP_W*MAP_H;i++)
     if(tileMap[i]===T.ROAD&&waterMrk[i])tileMap[i]=T.BRIDGE;
+
+  // Remove road pockets disconnected from the spawn, record connected road tiles
+  pruneOrphanRoads();
 
   // Parks — only overwrite BUILDING tiles
   function park(x0,y0,x1,y1){

@@ -1,6 +1,7 @@
 import { buildScene, sx, sz } from './scene.js';
 import { carGroup } from './car.js';
 import { resetPhysics } from './physics.js';
+import { placeDiamonds } from './diamonds.js';
 
 export const GameState = Object.freeze({
   MENU:'menu', PLAYING:'playing', GAME_OVER:'game_over'
@@ -9,17 +10,27 @@ export const GameState = Object.freeze({
 export let gameState = GameState.MENU;
 export const GAME_DURATION = 90;
 export let timeLeft = GAME_DURATION;
+export let won = false;
 
 export function startRound(mapType){
   buildScene(mapType);
   resetPhysics();
   carGroup.position.set(sx, 0, sz);
+  placeDiamonds();
   timeLeft = GAME_DURATION;
+  won = false;
   gameState = GameState.PLAYING;
 }
 
 export function updateState(dt){
   if(gameState!==GameState.PLAYING) return;
   timeLeft -= dt;
-  if(timeLeft<0.001){ timeLeft=0; gameState=GameState.GAME_OVER; }
+  if(timeLeft<0.001){ timeLeft=0; gameState=GameState.GAME_OVER; won=false; }
+}
+
+// Called when every diamond has been collected.
+export function winRound(){
+  if(gameState!==GameState.PLAYING) return;
+  gameState = GameState.GAME_OVER;
+  won = true;
 }

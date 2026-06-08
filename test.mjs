@@ -28,7 +28,7 @@ import {
 import {
   tileMap, mi, tileAt, tileCenter, tileCenterX, tileCenterZ,
   passable, resetMap, buildRandom, buildParis,
-  bldgH, bldgW, bldgD, bldgStyle, parkShade, waterMrk,
+  bldgH, bldgW, bldgD, bldgStyle, parkShade, waterMrk, roadTiles,
 } from './src/map.js';
 
 import {
@@ -147,8 +147,9 @@ test('has sufficient road coverage (≥5%)', () => {
 test('has buildings', () => assert.ok(cR.building > 0));
 
 test('center cross roads are passable', () => {
-  // buildRandom always lays center H+V roads at HALF_W/HALF_H
-  for (let tx = 0; tx < MAP_W; tx++) {
+  // buildRandom lays a center H+V road across the centered 64×64 play area
+  const RW = 64, OX = (MAP_W - RW) / 2;
+  for (let tx = OX; tx < OX + RW; tx++) {
     const t = tileMap[mi(tx, HALF_H)];
     assert.ok(t === T.ROAD || t === T.BRIDGE || t === T.WATER,
       `center H row tile(${tx},${HALF_H})=${t} unexpected`);
@@ -186,6 +187,36 @@ test('parkShade 0-5 for park tiles', () => {
   for (let i = 0; i < MAP_W * MAP_H; i++) {
     if (tileMap[i] !== T.PARK) continue;
     assert.ok(parkShade[i] >= 0 && parkShade[i] <= 5, `parkShade[${i}]=${parkShade[i]}`);
+  }
+});
+
+test('no orphan roads: every road/bridge tile is reachable from spawn', () => {
+  // BFS from spawn over road/bridge; assert it covers every road/bridge tile
+  const isRoad = (x,y) => x>=0&&x<MAP_W&&y>=0&&y<MAP_H &&
+    (tileMap[mi(x,y)]===T.ROAD || tileMap[mi(x,y)]===T.BRIDGE);
+  const seen = new Uint8Array(MAP_W*MAP_H);
+  const q = [HALF_W, HALF_H];
+  seen[mi(HALF_W,HALF_H)] = 1;
+  for (let h=0; h<q.length; h+=2) {
+    const x=q[h], y=q[h+1];
+    for (const [nx,ny] of [[x+1,y],[x-1,y],[x,y+1],[x,y-1]])
+      if (isRoad(nx,ny) && !seen[mi(nx,ny)]) { seen[mi(nx,ny)]=1; q.push(nx,ny); }
+  }
+  let orphans = 0;
+  for (let i=0;i<MAP_W*MAP_H;i++)
+    if ((tileMap[i]===T.ROAD||tileMap[i]===T.BRIDGE) && !seen[i]) orphans++;
+  assert.equal(orphans, 0, `${orphans} unreachable road tiles remain`);
+});
+
+test('roadTiles lists exactly the reachable road/bridge tiles', () => {
+  let roadCount = 0;
+  for (let i=0;i<MAP_W*MAP_H;i++)
+    if (tileMap[i]===T.ROAD||tileMap[i]===T.BRIDGE) roadCount++;
+  assert.ok(roadTiles.length > 0, 'roadTiles is empty');
+  assert.equal(roadTiles.length, roadCount, `roadTiles=${roadTiles.length} road tiles=${roadCount}`);
+  for (const {tx,ty} of roadTiles) {
+    const t = tileMap[mi(tx,ty)];
+    assert.ok(t===T.ROAD||t===T.BRIDGE, `roadTiles entry (${tx},${ty}) is type ${t}`);
   }
 });
 
