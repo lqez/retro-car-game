@@ -333,6 +333,8 @@ export function buildParis(){
   lmk(65,70,4,3);
   // Sacré-Cœur Basilica (3×4 at x=55-57, y=18-21; world cx=-90, cz=-528)
   lmk(55,18,3,4);
+  // Louvre Palace (4×4 at x=65-68, y=58-61; world cx=36, cz=-48)
+  lmk(65,58,4,4);
   // (sub-agents append lmk() calls here — one per landmark)
   // === END LANDMARK TILE RESERVATIONS ===
 
