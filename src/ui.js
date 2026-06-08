@@ -11,7 +11,7 @@ let selectedMap = null;
 let starting = false;
 
 const MMAP_VIEW = 32; // tiles visible in the viewport
-const MMAP_PX   = 120; // canvas pixel size
+const MMAP_PX   = 80;  // canvas pixel size
 let minimapEl, minimapCtx, minimapBg;
 
 let _ver = 'dev';
@@ -65,15 +65,15 @@ function initMinimap(){
   minimapEl.height = MMAP_PX;
   minimapCtx = minimapEl.getContext('2d');
 
-  // Precompute road-only map: transparent bg, bright pixels for road/bridge
+  // Precompute road-only map: transparent bg, solid gray for road/bridge
   minimapBg = document.createElement('canvas');
   minimapBg.width = MAP_W;
   minimapBg.height = MAP_H;
   const bgCtx = minimapBg.getContext('2d');
   for(let ty=0;ty<MAP_H;ty++) for(let tx=0;tx<MAP_W;tx++){
     const t = tileMap[mi(tx,ty)];
-    if(t===T.ROAD)   { bgCtx.fillStyle='rgba(180,205,255,1)'; bgCtx.fillRect(tx,ty,1,1); }
-    else if(t===T.BRIDGE){ bgCtx.fillStyle='rgba(210,185,150,1)'; bgCtx.fillRect(tx,ty,1,1); }
+    if(t===T.ROAD)       { bgCtx.fillStyle='rgba(155,160,168,1)'; bgCtx.fillRect(tx,ty,1,1); }
+    else if(t===T.BRIDGE){ bgCtx.fillStyle='rgba(145,135,122,1)'; bgCtx.fillRect(tx,ty,1,1); }
   }
   minimapEl.style.display = 'block';
 }
@@ -89,48 +89,36 @@ export function updateMinimap(carX, carZ){
   minimapCtx.arc(R, R, R, 0, Math.PI*2);
   minimapCtx.clip();
 
-  // Dark background
-  minimapCtx.fillStyle = 'rgb(7,9,16)';
-  minimapCtx.fillRect(0, 0, MMAP_PX, MMAP_PX);
+  // Clear to transparent — CSS backdrop-filter+background handles the dark blur
+  minimapCtx.clearRect(0, 0, MMAP_PX, MMAP_PX);
 
-  // 32×32 tile window centred on car
+  // 32×32 tile window centred on car; draw roads crisply (no blur)
   const cx = carX/TILE + HALF_W;
   const cz = carZ/TILE + HALF_H;
   const sx = cx - MMAP_VIEW/2, sy = cz - MMAP_VIEW/2;
-
-  // Road glow: wide + soft
-  minimapCtx.globalAlpha = 0.38;
-  minimapCtx.filter = 'blur(3px)';
   minimapCtx.drawImage(minimapBg, sx, sy, MMAP_VIEW, MMAP_VIEW, 0, 0, MMAP_PX, MMAP_PX);
 
-  // Road core: crisp centre
-  minimapCtx.globalAlpha = 1.0;
-  minimapCtx.filter = 'blur(0.6px)';
-  minimapCtx.drawImage(minimapBg, sx, sy, MMAP_VIEW, MMAP_VIEW, 0, 0, MMAP_PX, MMAP_PX);
-  minimapCtx.filter = 'none';
-
-  // Car dot (yellow, glowing)
+  // Car dot (yellow)
   minimapCtx.shadowColor = '#ffaa00';
-  minimapCtx.shadowBlur  = 8;
+  minimapCtx.shadowBlur  = 5;
   minimapCtx.beginPath();
-  minimapCtx.arc(R, R, 3.5, 0, Math.PI*2);
+  minimapCtx.arc(R, R, 2.5, 0, Math.PI*2);
   minimapCtx.fillStyle = '#ffd400';
   minimapCtx.fill();
   minimapCtx.shadowBlur = 0;
 
-  // ── Convex glass overlay ──────────────────────────────────────────────────
-  // vignette: darken edges like a lens rim
+  // Convex glass: edge vignette
   const vig = minimapCtx.createRadialGradient(R,R,R*0.35, R,R,R);
   vig.addColorStop(0,   'rgba(0,0,0,0)');
-  vig.addColorStop(0.65,'rgba(0,5,20,0.08)');
-  vig.addColorStop(1,   'rgba(0,5,30,0.62)');
+  vig.addColorStop(0.65,'rgba(0,5,20,0.06)');
+  vig.addColorStop(1,   'rgba(0,5,30,0.52)');
   minimapCtx.fillStyle = vig;
   minimapCtx.fillRect(0, 0, MMAP_PX, MMAP_PX);
 
-  // specular: bright top-left highlight simulating convex bulge
-  const spec = minimapCtx.createRadialGradient(R*0.52, R*0.38, 0, R*0.52, R*0.38, R*0.52);
-  spec.addColorStop(0,   'rgba(255,255,255,0.22)');
-  spec.addColorStop(0.4, 'rgba(255,255,255,0.06)');
+  // Convex glass: specular highlight (top-left)
+  const spec = minimapCtx.createRadialGradient(R*0.52, R*0.38, 0, R*0.52, R*0.38, R*0.5);
+  spec.addColorStop(0,   'rgba(255,255,255,0.2)');
+  spec.addColorStop(0.4, 'rgba(255,255,255,0.05)');
   spec.addColorStop(1,   'rgba(255,255,255,0)');
   minimapCtx.fillStyle = spec;
   minimapCtx.fillRect(0, 0, MMAP_PX, MMAP_PX);
