@@ -1,0 +1,231 @@
+import * as THREE from 'three';
+import { scene } from './scene.js';
+import { TILE, HALF_W, HALF_H, CONST_SPEED } from './constants.js';
+import { roadTiles, tileCenter } from './map.js';
+import { moveWithCollision, leadingClearForDir } from './physics.js';
+
+// ─── tunables ─────────────────────────────────────────────────────────────────
+const ENEMY_COUNT    = 8;
+const ENEMY_SPEED    = 0.80;         // fraction of player speed
+const TERRITORY_R    = 14;           // max Manhattan tiles from home while chasing
+const DETECT_DIST    = TILE * 12;    // world-unit radius to start chasing
+const THINK_INTERVAL = 0.85;         // seconds between direction decisions
+const COLLIDE_DIST   = TILE * 0.82;  // center-to-center game-over trigger
+const SPAWN_CLEAR    = 10;           // min Manhattan tiles from player spawn
+
+// ─── materials ────────────────────────────────────────────────────────────────
+const bodyMat      = new THREE.MeshToonMaterial({ color: 0x1a5fce });
+const darkMat      = new THREE.MeshToonMaterial({ color: 0x0d2d6e });
+const tireMat      = new THREE.MeshToonMaterial({ color: 0x050505 });
+const metalMat     = new THREE.MeshToonMaterial({ color: 0xc0c8d8 });
+const headlightMat = new THREE.MeshBasicMaterial({ color: 0xffff99 });
+const taillightMat = new THREE.MeshBasicMaterial({ color: 0xff2222 });
+
+const R = TILE * 0.24;
+
+function buildEnemyCar() {
+  const g = new THREE.Group();
+
+  // shadow blob
+  const shadow = new THREE.Mesh(
+    new THREE.CircleGeometry(TILE * 0.50, 16),
+    new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.30, depthWrite: false })
+  );
+  shadow.rotation.x = -Math.PI / 2;
+  shadow.position.y = 0.06;
+  g.add(shadow);
+
+  function box(sx, sy, sz_, px, py, pz, mat) {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(sx, sy, sz_), mat);
+    m.position.set(px, py, pz);
+    m.castShadow = true;
+    g.add(m);
+  }
+
+  // body
+  box(R*2.9, R*0.52, R*2.15, 0,       R*0.48+0.32, 0, bodyMat);
+  // cabin
+  box(R*1.12, R*0.60, R*1.50, -R*0.62, R*0.92+0.32, 0, darkMat);
+  box(R*0.34, R*1.40, R*1.55, -R*1.14, R*1.55+0.32, 0, bodyMat);
+
+  // front nose cylinder
+  const nose = new THREE.Mesh(
+    new THREE.CylinderGeometry(R*0.42, R*0.42, R*2.35, 12),
+    bodyMat
+  );
+  nose.position.set(R*1.65, R*0.45+0.28, 0);
+  nose.rotation.x = Math.PI / 2;
+  nose.castShadow = true;
+  g.add(nose);
+
+  // headlights
+  box(R*0.14, R*0.22, R*0.22,  R*1.62, R*0.62+0.32,  R*0.72, headlightMat);
+  box(R*0.14, R*0.22, R*0.22,  R*1.62, R*0.62+0.32, -R*0.72, headlightMat);
+  // taillights
+  box(R*0.14, R*0.22, R*0.22, -R*1.28, R*0.62+0.32,  R*0.72, taillightMat);
+  box(R*0.14, R*0.22, R*0.22, -R*1.28, R*0.62+0.32, -R*0.72, taillightMat);
+
+  // wheels + hubs
+  const wGeo  = new THREE.CylinderGeometry(R*0.70, R*0.70, R*0.52, 14);
+  const hubGeo = new THREE.CylinderGeometry(R*0.38, R*0.38, R*0.54, 10);
+  [
+    [ R*0.85, R*0.70+0.10,  R*1.22],
+    [ R*0.85, R*0.70+0.10, -R*1.22],
+    [-R*1.05, R*0.70+0.10,  R*1.22],
+    [-R*1.05, R*0.70+0.10, -R*1.22],
+  ].forEach(([wx, wy, wz]) => {
+    const w = new THREE.Mesh(wGeo, tireMat);
+    w.rotation.x = Math.PI / 2;
+    w.position.set(wx, wy, wz);
+    w.castShadow = true;
+    g.add(w);
+    const h = new THREE.Mesh(hubGeo, metalMat);
+    h.rotation.x = Math.PI / 2;
+    h.position.set(wx, wy, wz);
+    g.add(h);
+  });
+
+  return g;
+}
+
+let enemies = [];
+
+export function clearEnemies() {
+  for (const e of enemies) scene.remove(e.group);
+  enemies = [];
+}
+
+export function placeEnemies(spawnTx = HALF_W, spawnTy = HALF_H) {
+  clearEnemies();
+
+  const cand = roadTiles.filter(t =>
+    Math.abs(t.tx - spawnTx) + Math.abs(t.ty - spawnTy) > SPAWN_CLEAR
+  );
+  for (let i = cand.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [cand[i], cand[j]] = [cand[j], cand[i]];
+  }
+
+  const DIRS = [[1,0],[-1,0],[0,1],[0,-1]];
+  const n = Math.min(ENEMY_COUNT, cand.length);
+  for (let i = 0; i < n; i++) {
+    const { tx, ty } = cand[i];
+    const { x, z }   = tileCenter(tx, ty);
+    const group = buildEnemyCar();
+    group.position.set(x, 0, z);
+    scene.add(group);
+    const [dx, dz] = DIRS[Math.floor(Math.random() * 4)];
+    enemies.push({
+      group, x, z,
+      homeTx: tx, homeTy: ty,
+      dx, dz,
+      thinkTimer: Math.random() * THINK_INTERVAL,
+      stuckTimer: 0,
+      turnBias: Math.random() < 0.5 ? 1 : -1,
+    });
+  }
+}
+
+function tileOf(wx, wz) {
+  return {
+    tx: Math.round(wx / TILE + HALF_W),
+    ty: Math.round(wz / TILE + HALF_H),
+  };
+}
+
+// Update all enemies; returns true if any enemy collided with the player.
+export function updateEnemies(dt, carX, carZ) {
+  let hitPlayer = false;
+
+  for (const e of enemies) {
+    const { tx: curTx, ty: curTy } = tileOf(e.x, e.z);
+    const inTerritory  = Math.abs(curTx - e.homeTx) + Math.abs(curTy - e.homeTy) <= TERRITORY_R;
+    const distToPlayer = Math.hypot(e.x - carX, e.z - carZ);
+    const canChase     = distToPlayer < DETECT_DIST && inTerritory;
+
+    // ── AI: choose direction periodically ─────────────────────────────────────
+    e.thinkTimer -= dt;
+    if (e.thinkTimer <= 0) {
+      e.thinkTimer = THINK_INTERVAL * (0.75 + Math.random() * 0.5);
+
+      let wantDx = e.dx, wantDz = e.dz;
+
+      if (canChase) {
+        const ddx = carX - e.x, ddz = carZ - e.z;
+        // 25% chance of picking the wrong axis (dumb mistake)
+        const pickMinor = Math.random() < 0.25;
+        if (pickMinor
+          ? Math.abs(ddx) < Math.abs(ddz)
+          : Math.abs(ddx) >= Math.abs(ddz)
+        ) { wantDx = ddx > 0 ? 1 : -1; wantDz = 0; }
+        else { wantDx = 0; wantDz = ddz > 0 ? 1 : -1; }
+
+      } else if (!inTerritory) {
+        // return home
+        const dhx = e.homeTx - curTx, dhz = e.homeTy - curTy;
+        if (Math.abs(dhx) >= Math.abs(dhz)) { wantDx = dhx > 0 ? 1 : -1; wantDz = 0; }
+        else                                 { wantDx = 0; wantDz = dhz > 0 ? 1 : -1; }
+      }
+      // else patrol: keep current direction; wall-avoidance handles turns
+
+      if (wantDx !== e.dx || wantDz !== e.dz) {
+        const nx = e.x + wantDx * CONST_SPEED * ENEMY_SPEED * dt;
+        const nz = e.z + wantDz * CONST_SPEED * ENEMY_SPEED * dt;
+        if (leadingClearForDir(nx, nz, wantDx, wantDz)) {
+          e.dx = wantDx; e.dz = wantDz;
+        }
+      }
+    }
+
+    // ── movement (scaled dt for slower speed) ─────────────────────────────────
+    const eDt  = dt * ENEMY_SPEED;
+    const move = moveWithCollision(e.x, e.z, e.dx, e.dz, eDt);
+    if (move.moved) {
+      e.x = move.x; e.z = move.z;
+      e.stuckTimer = 0;
+    } else {
+      e.stuckTimer += dt;
+      const rX = -e.dz, rZ =  e.dx;
+      const lX =  e.dz, lZ = -e.dx;
+      const bX = -e.dx, bZ = -e.dz;
+      let tries;
+      if (e.stuckTimer > 0.45) {
+        tries = [[bX, bZ], [rX, rZ], [lX, lZ]];
+        e.stuckTimer = 0;
+      } else {
+        tries = e.turnBias > 0 ? [[rX, rZ], [lX, lZ], [bX, bZ]] : [[lX, lZ], [rX, rZ], [bX, bZ]];
+      }
+      for (const [tx_, tz_] of tries) {
+        const tnx = e.x + tx_ * CONST_SPEED * eDt;
+        const tnz = e.z + tz_ * CONST_SPEED * eDt;
+        if (leadingClearForDir(tnx, tnz, tx_, tz_)) {
+          const tm = moveWithCollision(e.x, e.z, tx_, tz_, eDt);
+          if (!tm.moved) continue;
+          e.dx = tx_; e.dz = tz_;
+          e.x = tm.x; e.z = tm.z;
+          e.turnBias = -e.turnBias;
+          e.stuckTimer = 0;
+          break;
+        }
+      }
+    }
+
+    // ── visual update ─────────────────────────────────────────────────────────
+    e.group.position.x = e.x;
+    e.group.position.z = e.z;
+    const tRotY = Math.atan2(-e.dz, e.dx);
+    let diff = tRotY - e.group.rotation.y;
+    while (diff >  Math.PI) diff -= Math.PI * 2;
+    while (diff < -Math.PI) diff += Math.PI * 2;
+    e.group.rotation.y += Math.sign(diff) * Math.min(Math.abs(diff), 18 * dt);
+
+    // ── player collision ──────────────────────────────────────────────────────
+    if ((e.x - carX) ** 2 + (e.z - carZ) ** 2 < COLLIDE_DIST * COLLIDE_DIST) {
+      hitPlayer = true;
+    }
+  }
+
+  return hitPlayer;
+}
+
+export function getEnemies() { return enemies; }

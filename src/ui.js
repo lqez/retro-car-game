@@ -1,10 +1,12 @@
-import { timeLeft, startRound } from './state.js';
+import { timeLeft, startRound, lossReason } from './state.js';
 import { calibrate, reqSensor, initJoystick } from './input.js';
 import { CONST_SPEED, MAP_W, MAP_H, HALF_W, HALF_H, TILE, T } from './constants.js';
 import { tileMap, mi } from './map.js';
 import { getDiamonds, collectedCount, totalCount, clearDiamonds } from './diamonds.js';
+import { getEnemies, clearEnemies } from './enemies.js';
 
 const DIAMOND_BLUE = '#2ad4ff';
+const ENEMY_RED    = '#ff4444';
 
 export let gameOn = false;
 
@@ -120,26 +122,48 @@ export function updateMinimap(carX, carZ){
   minimapCtx.fillStyle = spec;
   minimapCtx.fillRect(0, 0, MMAP_PX, MMAP_PX);
 
-  // ── diamond markers (drawn on top of the glass so they stay legible) ───────
   const tilesToPx = MMAP_PX / MMAP_VIEW;
   const edgeR = R - 4;
+
+  // ── diamond markers ──────────────────────────────────────────────────────────
   minimapCtx.fillStyle = DIAMOND_BLUE;
   for(const d of getDiamonds()){
     if(d.collected) continue;
     const dxp = (d.x - carX)/TILE * tilesToPx;
     const dzp = (d.z - carZ)/TILE * tilesToPx;
     if(Math.hypot(dxp,dzp) <= edgeR){
-      // in view → small bright-blue box
       const bx = R + dxp, by = R + dzp;
       minimapCtx.fillRect(bx-2.5, by-2.5, 5, 5);
     }else{
-      // out of view → arrow on the rim pointing toward it
       const ang = Math.atan2(dzp, dxp);
       minimapCtx.save();
       minimapCtx.translate(R + Math.cos(ang)*edgeR, R + Math.sin(ang)*edgeR);
       minimapCtx.rotate(ang);
       minimapCtx.beginPath();
       minimapCtx.moveTo(5,0); minimapCtx.lineTo(-3,-3.5); minimapCtx.lineTo(-3,3.5);
+      minimapCtx.closePath();
+      minimapCtx.fill();
+      minimapCtx.restore();
+    }
+  }
+
+  // ── enemy markers (red dots / arrows) ───────────────────────────────────────
+  minimapCtx.fillStyle = ENEMY_RED;
+  for(const e of getEnemies()){
+    const dxp = (e.x - carX)/TILE * tilesToPx;
+    const dzp = (e.z - carZ)/TILE * tilesToPx;
+    if(Math.hypot(dxp,dzp) <= edgeR){
+      const bx = R + dxp, by = R + dzp;
+      minimapCtx.beginPath();
+      minimapCtx.arc(bx, by, 3, 0, Math.PI*2);
+      minimapCtx.fill();
+    }else{
+      const ang = Math.atan2(dzp, dxp);
+      minimapCtx.save();
+      minimapCtx.translate(R + Math.cos(ang)*edgeR, R + Math.sin(ang)*edgeR);
+      minimapCtx.rotate(ang);
+      minimapCtx.beginPath();
+      minimapCtx.moveTo(4,0); minimapCtx.lineTo(-3,-3); minimapCtx.lineTo(-3,3);
       minimapCtx.closePath();
       minimapCtx.fill();
       minimapCtx.restore();
@@ -168,9 +192,11 @@ export function showGameOver(won, collected, total){
   recalBtn.style.display='none';
   if(minimapEl) minimapEl.style.display='none';
   if(gameOverMsg){
-    gameOverMsg.textContent = won
-      ? `🎉 모든 다이아몬드 수집! ${collected}/${total}`
-      : `⏰ 시간 종료  💎 ${collected}/${total}`;
+    let msg;
+    if(won)                     msg = `🎉 모든 다이아몬드 수집! ${collected}/${total}`;
+    else if(lossReason==='enemy') msg = `🚨 적 차량에 충돌! 💎 ${collected}/${total}`;
+    else                          msg = `⏰ 시간 종료  💎 ${collected}/${total}`;
+    gameOverMsg.textContent = msg;
     gameOverMsg.style.display='block';
   }
   returnBtn.style.display='block';
@@ -182,6 +208,7 @@ function returnToMenu(){
   gameOn=false;
   selectedMap=null;
   clearDiamonds();
+  clearEnemies();
   minimapBg=null; minimapCtx=null; minimapEl=null;
   mapSelectEl.style.display='flex';
   overlay.style.display='flex';
