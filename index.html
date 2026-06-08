@@ -27,10 +27,13 @@
   #returnBtn:active{transform:translate(-50%,-50%) scale(.95)}
   #minimap{position:fixed;bottom:16px;left:16px;width:80px;height:80px;border-radius:50%;border:1.5px solid rgba(180,210,255,.28);box-shadow:0 4px 18px rgba(0,0,60,.5),inset 0 1px 3px rgba(255,255,255,.15);z-index:10;display:none;background:rgba(0,0,0,.42);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);}
   #gameOverMsg{position:fixed;top:38%;left:50%;transform:translate(-50%,-50%);padding:14px 30px;border-radius:14px;background:rgba(0,0,0,.62);color:#fff;font-size:clamp(1rem,3.5vw,1.4rem);font-weight:800;text-align:center;z-index:15;display:none;white-space:nowrap;box-shadow:0 4px 24px rgba(0,0,0,.5);}
-  .charBtn{padding:12px 22px;border:2px solid rgba(100,220,255,.45);border-radius:12px;font-size:clamp(.88rem,2.5vw,1rem);font-weight:800;background:rgba(100,220,255,.08);color:#64dcff;cursor:pointer;transition:background .15s,transform .1s;}
-  .charBtn:hover,.charBtn:active{background:rgba(100,220,255,.22);transform:scale(.97);}
-  .charBtn.active{background:rgba(100,220,255,.28);border-color:#64dcff;box-shadow:0 0 14px rgba(100,220,255,.45);}
-  .sectionLabel{color:#888;font-size:clamp(.72rem,2vw,.82rem);letter-spacing:2px;text-transform:uppercase;margin-bottom:10px;}
+  .charBtn{display:flex;flex-direction:column;align-items:center;gap:6px;padding:8px 10px 10px;border:2px solid rgba(100,220,255,.35);border-radius:14px;background:rgba(100,220,255,.07);color:#64dcff;cursor:pointer;transition:background .15s,transform .12s,border-color .15s;width:96px;}
+  .charBtn img{width:80px;height:80px;object-fit:contain;display:block;pointer-events:none;}
+  .charBtn span{font-size:clamp(.82rem,2.2vw,.95rem);font-weight:800;line-height:1;}
+  .charBtn:hover,.charBtn:active{background:rgba(100,220,255,.2);transform:scale(.96);}
+  .charBtn.active{background:rgba(100,220,255,.25);border-color:#64dcff;box-shadow:0 0 16px rgba(100,220,255,.5);}
+  .sectionLabel{color:#888;font-size:clamp(.7rem,2vw,.8rem);letter-spacing:2px;text-transform:uppercase;margin-bottom:10px;}
+
 </style>
 </head>
 <body>
@@ -41,9 +44,10 @@
     <!-- Character selection -->
     <p class="sectionLabel">캐릭터 선택</p>
     <div id="charSelect" style="display:flex;flex-wrap:wrap;justify-content:center;gap:12px;margin-bottom:28px;">
-      <button class="charBtn" data-char="han">한</button>
-      <button class="charBtn" data-char="poong">풍장군</button>
-      <button class="charBtn" data-char="elvers">엘버스</button>
+      <button class="charBtn" data-char="han"><img src="./assets/car/han.png" alt="한"><span>한</span></button>
+      <button class="charBtn" data-char="poong"><img src="./assets/car/poong.png" alt="풍장군"><span>풍장군</span></button>
+      <button class="charBtn" data-char="elvers"><img src="./assets/car/elvers.png" alt="엘버스"><span>엘버스</span></button>
+
     </div>
     <!-- Map selection -->
     <p class="sectionLabel">도시 선택</p>
