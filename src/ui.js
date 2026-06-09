@@ -26,6 +26,10 @@ let mapCards = [];
 
 const START_BACKDROP_MS = 720;
 const MMAP_VIEW = 32; // tiles visible in the viewport
+// minimap marker sizes (px)
+const MMAP_DIAMOND_SIZE = 8;   // in-view diamond square side
+const MMAP_DIAMOND_ARROW = 1.6; // off-view diamond arrow scale (base shape ~5px long)
+const MMAP_ENEMY_R = 4.5;      // enemy dot radius
 let minimapPx = 80; // synced to CSS size
 let minimapEl, minimapCtx, minimapBg;
 
@@ -265,14 +269,16 @@ export function updateMinimap(carX, carZ){
     const dzp = (d.z - carZ)/TILE * tilesToPx;
     if(Math.hypot(dxp,dzp) <= edgeR){
       const bx = R + dxp, by = R + dzp;
-      minimapCtx.fillRect(bx-2.5, by-2.5, 5, 5);
+      const h = MMAP_DIAMOND_SIZE/2;
+      minimapCtx.fillRect(bx-h, by-h, MMAP_DIAMOND_SIZE, MMAP_DIAMOND_SIZE);
     }else{
       const ang = Math.atan2(dzp, dxp);
+      const a = MMAP_DIAMOND_ARROW;
       minimapCtx.save();
       minimapCtx.translate(R + Math.cos(ang)*edgeR, R + Math.sin(ang)*edgeR);
       minimapCtx.rotate(ang);
       minimapCtx.beginPath();
-      minimapCtx.moveTo(5,0); minimapCtx.lineTo(-3,-3.5); minimapCtx.lineTo(-3,3.5);
+      minimapCtx.moveTo(5*a,0); minimapCtx.lineTo(-3*a,-3.5*a); minimapCtx.lineTo(-3*a,3.5*a);
       minimapCtx.closePath();
       minimapCtx.fill();
       minimapCtx.restore();
@@ -287,7 +293,7 @@ export function updateMinimap(carX, carZ){
     if(Math.hypot(dxp,dzp) <= edgeR){
       const bx = R + dxp, by = R + dzp;
       minimapCtx.beginPath();
-      minimapCtx.arc(bx, by, 3, 0, Math.PI*2);
+      minimapCtx.arc(bx, by, MMAP_ENEMY_R, 0, Math.PI*2);
       minimapCtx.fill();
     }
   }

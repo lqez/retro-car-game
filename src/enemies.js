@@ -1,13 +1,16 @@
 import * as THREE from 'three';
 import { scene, camera } from './scene.js';
-import { TILE, CONST_SPEED, ENEMY_SPEED,
+import { TILE, T, CONST_SPEED, ENEMY_SPEED,
          ENEMY_TERRITORY_R as TERRITORY_R, ENEMY_DETECT_DIST as DETECT_DIST,
          ENEMY_THINK_INTERVAL as THINK_INTERVAL, ENEMY_COLLIDE_DIST as COLLIDE_DIST,
          ENEMY_ENEMY_COLLIDE_DIST as ENEMY_CRASH_DIST,
          ENEMY_SPAWN_CLEAR as SPAWN_CLEAR, ENEMY_STUN_TIME as STUN_TIME,
          ENEMY_STUN_FREE_TIME as STUN_FREE_TIME,
-         ENEMY_SPIN_SPEED as SPIN_SPEED, ENEMY_ROT_SPEED } from './constants.js';
-import { DEFAULT_GAMEPLAY, HALF_W, HALF_H, roadTiles, tileCenter } from './map.js';
+         ENEMY_SPIN_SPEED as SPIN_SPEED, ENEMY_ROT_SPEED,
+         ENEMY_FLOW_MAX_TILES as FLOW_MAX_TILES,
+         ENEMY_CHASE_KEEP_MUL as CHASE_KEEP_MUL,
+         ENEMY_TERRITORY_SLACK as TERRITORY_SLACK } from './constants.js';
+import { DEFAULT_GAMEPLAY, HALF_W, HALF_H, MAP_W, MAP_H, mi, tileMap, roadTiles, tileCenter } from './map.js';
 import { clearForDir, moveWithCollision, leadingClearForDir } from './physics.js';
 import { gasStunsAt } from './gas.js';
 import { explode } from './particles.js';
@@ -94,6 +97,59 @@ const DIRS = [[1,0],[-1,0],[0,1],[0,-1]];
 const cameraFrustum = new THREE.Frustum();
 const cameraProjView = new THREE.Matrix4();
 const cameraPoint = new THREE.Vector3();
+
+// ─── chase flow field ───────────────────────────────────────────────────────────
+// BFS distance map from the player's tile across the road grid. Chasing enemies
+// follow the gradient (step toward the neighbour with the smaller distance), which
+// routes around buildings and — because the distance strictly drops along the true
+// shortest path — never oscillates the way a greedy straight-line metric does.
+let flow = new Int32Array(0);
+let flowReady = false;
+const flowQueue = [];
+
+function gridTileOf(wx, wz) {
+  return { tx: Math.floor(wx / TILE + HALF_W), ty: Math.floor(wz / TILE + HALF_H) };
+}
+
+function tileWalkable(tx, ty) {
+  if (tx < 0 || tx >= MAP_W || ty < 0 || ty >= MAP_H) return false;
+  const t = tileMap[mi(tx, ty)];
+  return t === T.ROAD || t === T.BRIDGE;
+}
+
+function buildFlowField(carX, carZ) {
+  flowReady = false;
+  const n = MAP_W * MAP_H;
+  if (flow.length !== n) flow = new Int32Array(n);
+  flow.fill(-1);
+
+  const { tx: sTx, ty: sTy } = gridTileOf(carX, carZ);
+  if (!tileWalkable(sTx, sTy)) return;   // player off-road: leave field empty → fallback
+
+  flow[mi(sTx, sTy)] = 0;
+  flowQueue.length = 0;
+  flowQueue.push(sTx, sTy);
+  let head = 0;
+  while (head < flowQueue.length) {
+    const x = flowQueue[head++], y = flowQueue[head++];
+    const d = flow[mi(x, y)];
+    if (d >= FLOW_MAX_TILES) continue;
+    for (const [dx, dz] of DIRS) {
+      const nx = x + dx, ny = y + dz;
+      if (!tileWalkable(nx, ny)) continue;
+      const id = mi(nx, ny);
+      if (flow[id] !== -1) continue;
+      flow[id] = d + 1;
+      flowQueue.push(nx, ny);
+    }
+  }
+  flowReady = true;
+}
+
+function flowDistAt(tx, ty) {
+  if (!flowReady || tx < 0 || tx >= MAP_W || ty < 0 || ty >= MAP_H) return -1;
+  return flow[mi(tx, ty)];
+}
 
 function validDirsAt(x, z) {
   return DIRS.filter(([dx,dz]) => clearForDir(x,z,dx,dz) && leadingClearForDir(x,z,dx,dz));
@@ -217,6 +273,7 @@ export function placeEnemies(count = DEFAULT_GAMEPLAY.enemyCount, spawnTx = HALF
       turnBias: Math.random() < 0.5 ? 1 : -1,
       stunTimer: 0,
       stunFreeTimer: 0,
+      chasing: false,
     });
   }
 }
@@ -291,6 +348,10 @@ function resolveEnemyCrashes() {
 export function updateEnemies(dt, carX, carZ, chase = true) {
   let hitPlayer = false;
 
+  // Shared path-distance field from the player, used by every chasing enemy.
+  if (chase) buildFlowField(carX, carZ);
+  else flowReady = false;
+
   for (const e of enemies) {
     // ── gas stun: freeze in place and spin, ignore AI/movement ────────────────
     if (gasStunsAt(e.x, e.z) && canStartStun(e)) startStun(e);
@@ -302,9 +363,21 @@ export function updateEnemies(dt, carX, carZ, chase = true) {
     }
 
     const { tx: curTx, ty: curTy } = tileOf(e.x, e.z);
-    const inTerritory  = Math.abs(curTx - e.homeTx) + Math.abs(curTy - e.homeTy) <= TERRITORY_R;
+    const homeDist     = Math.abs(curTx - e.homeTx) + Math.abs(curTy - e.homeTy);
+    const inTerritory  = homeDist <= TERRITORY_R;
     const distToPlayer = Math.hypot(e.x - carX, e.z - carZ);
-    const canChase     = chase && distToPlayer < DETECT_DIST && inTerritory;
+
+    // Hysteresis so enemies don't flip-flop on the detection / territory edge:
+    // start chasing inside the tight bounds, keep chasing out to looser ones.
+    if (!chase) {
+      e.chasing = false;
+    } else if (e.chasing) {
+      e.chasing = distToPlayer < DETECT_DIST * CHASE_KEEP_MUL &&
+                  homeDist <= TERRITORY_R + TERRITORY_SLACK;
+    } else {
+      e.chasing = distToPlayer < DETECT_DIST && inTerritory;
+    }
+    const canChase = e.chasing;
 
     // ── AI: choose direction periodically ─────────────────────────────────────
     e.thinkTimer -= dt;
@@ -314,13 +387,22 @@ export function updateEnemies(dt, carX, carZ, chase = true) {
       let wantDx = e.dx, wantDz = e.dz;
 
       if (canChase) {
+        const { tx: eTx, ty: eTy } = gridTileOf(e.x, e.z);
         const ddx = carX - e.x, ddz = carZ - e.z;
         [wantDx, wantDz] = chooseBestDir(e, dt, (dx, dz) => {
-          const nextX = e.x + dx * TILE;
-          const nextZ = e.z + dz * TILE;
-          return -Math.hypot(carX - nextX, carZ - nextZ)
-            + (Math.sign(ddx) === dx ? 0.18 : 0)
-            + (Math.sign(ddz) === dz ? 0.18 : 0);
+          // Primary: follow the BFS gradient (lower distance = closer along a real
+          // path). The ×10 weight makes one tile of progress dominate the small
+          // momentum/heading tie-breakers, so the gradient always wins.
+          const fd = flowDistAt(eTx + dx, eTy + dz);
+          if (fd >= 0) {
+            return -fd * 10
+              + (Math.sign(ddx) === dx ? 0.1 : 0)
+              + (Math.sign(ddz) === dz ? 0.1 : 0);
+          }
+          // Fallback (player unreachable on the grid): greedy straight-line, but
+          // always worse than any tile the flood fill actually reached.
+          const nextX = e.x + dx * TILE, nextZ = e.z + dz * TILE;
+          return -1000 - Math.hypot(carX - nextX, carZ - nextZ);
         });
 
       } else if (!inTerritory) {
